@@ -1,0 +1,7 @@
+.streamlit/secrets.toml
+assets/logo_cropped.png
+__pycache__/
+*.pyc
+*.pyo
+.env
+get_shopify_token.py

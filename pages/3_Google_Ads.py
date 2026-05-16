@@ -41,25 +41,30 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
     color: {BLUE} !important;
     border: none !important;
 }}
+a[data-testid="stPageLink-NavLink"] {{
+    color: {T2} !important; font-weight: 600 !important; font-size: 0.8rem !important;
+    text-decoration: none !important; padding: 0.35rem 0.9rem !important;
+    border-radius: 6px !important; background: transparent !important; display: inline-block;
+}}
+a[data-testid="stPageLink-NavLink"]:hover {{
+    background: rgba(59,130,246,0.18) !important; color: {BLUE} !important;
+}}
+div[data-testid="stPageLink"] {{ padding-top: 0.85rem; }}
 </style>
 """, unsafe_allow_html=True)
 
-_NAV_LINK  = f"padding:0.35rem 0.9rem;border-radius:6px;font-size:0.8rem;font-weight:600;color:{T2};text-decoration:none;white-space:nowrap;"
-_NAV_ACTIVE = f"padding:0.35rem 0.9rem;border-radius:6px;font-size:0.8rem;font-weight:700;color:{BLUE};background:rgba(59,130,246,0.18);text-decoration:none;white-space:nowrap;"
-
-_c_logo, _c_nav = st.columns([1, 11])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _ = st.columns([1.5, 1, 1, 1, 1.2, 5])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
-with _c_nav:
-    st.markdown(f"""
-    <div style="display:flex;align-items:center;gap:0.15rem;padding-top:1.1rem;">
-      <a href="/" target="_self" style="{_NAV_LINK}">Home</a>
-      <a href="/Meta_Ads" target="_self" style="{_NAV_LINK}">Meta Ads</a>
-      <a href="/Shopify" target="_self" style="{_NAV_LINK}">Shopify</a>
-      <a href="/Google_Ads" target="_self" style="{_NAV_ACTIVE}">Google Ads</a>
-    </div>
-    """, unsafe_allow_html=True)
+with _c_h:
+    st.page_link("app.py", label="Home")
+with _c_m:
+    st.page_link("pages/1_Meta_Ads.py", label="Meta Ads")
+with _c_s:
+    st.page_link("pages/2_Shopify.py", label="Shopify")
+with _c_g:
+    st.markdown(f'<div style="padding-top:1.1rem;"><span style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.8rem;font-weight:700;color:{BLUE};background:rgba(59,130,246,0.18);white-space:nowrap;">Google Ads</span></div>', unsafe_allow_html=True)
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 1.8rem;"></div>', unsafe_allow_html=True)
 
 st.markdown(f"""

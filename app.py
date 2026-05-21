@@ -107,9 +107,9 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
     margin-bottom: 0.3rem;
 }}
 .platform-metric-value {{
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #ffffff;
+    font-size: 1.6rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
     letter-spacing: -0.5px;
     line-height: 1;
     margin-bottom: 1.2rem;

@@ -1,5 +1,4 @@
 .streamlit/secrets.toml
-assets/logo_cropped.png
 __pycache__/
 *.pyc
 *.pyo

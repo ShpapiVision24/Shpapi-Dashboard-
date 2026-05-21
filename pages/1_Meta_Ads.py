@@ -72,15 +72,20 @@ div[data-testid="stDataFrame"] > div {{ background: {SURFACE} !important; border
     color: {GOLD} !important;
     border: none !important;
 }}
+div[data-testid="stPageLink"] {{
+    border: none !important; background: none !important; box-shadow: none !important;
+    padding: 0 !important; margin: 0 !important; padding-top: 1rem !important;
+}}
 a[data-testid="stPageLink-NavLink"] {{
-    color: {T2} !important; font-weight: 600 !important; font-size: 0.8rem !important;
-    text-decoration: none !important; padding: 0.35rem 0.9rem !important;
-    border-radius: 6px !important; background: transparent !important; display: inline-block;
+    color: {T2} !important; font-weight: 600 !important; font-size: 0.78rem !important;
+    text-decoration: none !important; padding: 0.3rem 0.75rem !important;
+    border-radius: 6px !important; background: transparent !important;
+    border: none !important; display: inline-block !important;
 }}
 a[data-testid="stPageLink-NavLink"]:hover {{
-    background: rgba(59,130,246,0.18) !important; color: {GOLD} !important;
+    background: rgba(59,130,246,0.15) !important; color: {GOLD} !important;
 }}
-div[data-testid="stPageLink"] {{ padding-top: 0.85rem; }}
+a[data-testid="stPageLink-NavLink"] svg {{ display: none !important; }}
 </style>
 """, unsafe_allow_html=True)
 

@@ -86,6 +86,9 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
     border-radius: 16px;
     padding: 2rem;
     height: 100%;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
 }}
 .platform-title {{
     font-size: 0.65rem;
@@ -106,7 +109,7 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
 .platform-metric-value {{
     font-size: 1.6rem;
     font-weight: 700;
-    color: {BLUE};
+    color: #ffffff;
     letter-spacing: -0.5px;
     line-height: 1;
     margin-bottom: 1.2rem;

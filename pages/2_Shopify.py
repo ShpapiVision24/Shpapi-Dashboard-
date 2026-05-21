@@ -41,11 +41,11 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
 .kpi-grid {{ display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1rem; }}
 .kpi {{ background: {SURFACE}; border: 1px solid {BORDER}; border-radius: 12px; padding: 1.4rem 1.6rem 1.3rem; }}
 .kpi-label {{ font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.8px; color: {T3}; margin-bottom: 0.65rem; }}
-.kpi-value {{ font-size: 2rem; font-weight: 700; color: {BLUE}; letter-spacing: -1px; line-height: 1; }}
+.kpi-value {{ font-size: 2rem; font-weight: 700; color: #ffffff; letter-spacing: -1px; line-height: 1; }}
 .stat-grid {{ display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 2.4rem; }}
 .stat {{ background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 1rem 1.4rem; }}
 .stat-label {{ font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.8px; color: {T3}; margin-bottom: 0.4rem; }}
-.stat-value {{ font-size: 1.15rem; font-weight: 600; color: {BLUE}; letter-spacing: -0.3px; line-height: 1; }}
+.stat-value {{ font-size: 1.15rem; font-weight: 600; color: #ffffff; letter-spacing: -0.3px; line-height: 1; }}
 .section {{ font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; color: {T3}; margin: 0 0 0.9rem 0; display: flex; align-items: center; gap: 1rem; }}
 .section::after {{ content: ''; flex: 1; height: 1px; background: {BORDER}; }}
 .surface {{ background: {SURFACE}; border: 1px solid {BORDER}; border-radius: 12px; padding: 1.4rem 1.4rem 0.6rem; margin-bottom: 1rem; }}

@@ -214,7 +214,7 @@ with col1:
     meta_clicks = f"{meta['clicks']:,}"       if meta else "—"
     meta_impr   = f"{meta['impressions']:,}"  if meta else "—"
     st.markdown(f"""
-    <div class="platform-card" style="border-left:4px solid #3b82f6;">
+    <div class="platform-card" style="border-top:3px solid #3b82f6;">
       <div class="platform-title">Meta Ads</div>
       <div class="platform-metric-label">Total Spend (All Time)</div>
       <div class="platform-metric-value">{meta_spend}</div>
@@ -222,16 +222,16 @@ with col1:
       <div class="platform-metric-value" style="font-size:1.2rem;">{meta_clicks}</div>
       <div class="platform-metric-label">Impressions</div>
       <div class="platform-metric-value" style="font-size:1.2rem;">{meta_impr}</div>
-      <a href="/Meta_Ads" target="_self" style="display:inline-block;margin-top:1rem;font-size:0.78rem;font-weight:600;color:{BLUE};text-decoration:none;">View Meta Ads details →</a>
     </div>
     """, unsafe_allow_html=True)
+    st.page_link("pages/1_Meta_Ads.py", label="View Meta Ads details →")
 
 with col2:
     sh_rev    = f"${shopify['revenue_30d']:,.2f}"  if shopify else "—"
     sh_orders = f"{shopify['orders_30d']:,}"         if shopify else "—"
     sh_total  = f"{shopify['total_orders']:,}"        if shopify else "—"
     st.markdown(f"""
-    <div class="platform-card" style="border-left:4px solid #22c55e;">
+    <div class="platform-card" style="border-top:3px solid #22c55e;">
       <div class="platform-title">Shopify</div>
       <div class="platform-metric-label">Revenue</div>
       <div class="platform-metric-value">{sh_rev}</div>
@@ -239,13 +239,13 @@ with col2:
       <div class="platform-metric-value" style="font-size:1.2rem;">{sh_orders}</div>
       <div class="platform-metric-label">Total Orders (All Time)</div>
       <div class="platform-metric-value" style="font-size:1.2rem;">{sh_total}</div>
-      <a href="/Shopify" target="_self" style="display:inline-block;margin-top:1rem;font-size:0.78rem;font-weight:600;color:{BLUE};text-decoration:none;">View Shopify details →</a>
     </div>
     """, unsafe_allow_html=True)
+    st.page_link("pages/2_Shopify.py", label="View Shopify details →")
 
 with col3:
     st.markdown(f"""
-    <div class="platform-card" style="border-left:4px solid #8b5cf6;opacity:0.6;">
+    <div class="platform-card" style="border-top:3px solid #8b5cf6;opacity:0.6;">
       <div class="platform-title">Google Ads</div>
       <div style="text-align:center;padding:3rem 1rem;">
         <div style="font-size:0.85rem;font-weight:600;color:{T2};margin-bottom:0.5rem;">Coming Soon</div>

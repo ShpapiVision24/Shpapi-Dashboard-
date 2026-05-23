@@ -205,6 +205,66 @@ with st.spinner("Loading overview..."):
     meta     = get_meta_summary()
     shopify  = get_shopify_summary()
 
+st.markdown('<div class="section">AI Growth Analyst</div>', unsafe_allow_html=True)
+
+st.markdown(f"""
+<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;padding:1.5rem 1.5rem 1rem;margin-bottom:1.5rem;">
+  <div style="font-size:0.75rem;color:{T2};margin-bottom:1rem;">
+    Ask anything about your ads, revenue, or growth — powered by Claude AI.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+if "ai_messages" not in st.session_state:
+    st.session_state.ai_messages = []
+
+suggested = ["What are my top 3 growth opportunities?", "Why is my ROAS low?", "How can I improve my conversion rate?"]
+s1, s2, s3 = st.columns(3)
+for col, q in zip([s1, s2, s3], suggested):
+    with col:
+        if st.button(q, key=f"suggest_{q[:20]}", use_container_width=True):
+            st.session_state.ai_messages.append({"role": "user", "content": q})
+
+user_q = st.chat_input("Ask your AI analyst...")
+if user_q:
+    st.session_state.ai_messages.append({"role": "user", "content": user_q})
+
+if st.session_state.ai_messages:
+    for msg in st.session_state.ai_messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    last = st.session_state.ai_messages[-1]
+    if last["role"] == "user":
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing your data..."):
+                try:
+                    import anthropic as ac
+                    client = ac.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+                    meta_ctx  = f"Spend ${meta['spend']:,.2f} | Clicks {meta['clicks']:,} | Impressions {meta['impressions']:,}" if meta else "unavailable"
+                    shop_ctx  = f"Revenue ${shopify['revenue_30d']:,.2f} (30d) | Orders {shopify['orders_30d']} (30d) | Total Orders All-Time {shopify['total_orders']}" if shopify else "unavailable"
+                    system_p  = f"""You are a senior eCommerce growth analyst for Shpapi, a clothing and sunglasses brand.
+Current live data:
+- Meta Ads: {meta_ctx}
+- Shopify: {shop_ctx}
+Provide concise, actionable insights. Use bullet points. Focus on ROAS, CAC, conversion rate, and growth opportunities. Keep responses under 200 words."""
+                    resp = client.messages.create(
+                        model="claude-haiku-4-5-20251001",
+                        max_tokens=512,
+                        system=system_p,
+                        messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.ai_messages]
+                    )
+                    answer = resp.content[0].text
+                    st.markdown(answer)
+                    st.session_state.ai_messages.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.error(f"AI unavailable: {e}")
+
+if st.session_state.ai_messages:
+    if st.button("Clear conversation", key="clear_ai"):
+        st.session_state.ai_messages = []
+        st.rerun()
+
 st.markdown('<div class="section">Platform Overview</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3, gap="large")

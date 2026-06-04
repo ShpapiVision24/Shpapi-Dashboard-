@@ -176,6 +176,8 @@ if "qb_token" not in st.session_state and _STORED_REALM:
             st.session_state["qb_token"]   = new_tok["access_token"]
             st.session_state["qb_refresh"] = new_tok.get("refresh_token", _STORED_REFRESH)
             st.session_state["qb_realm"]   = _STORED_REALM
+        else:
+            st.session_state["qb_refresh_error"] = new_tok
 
 # ── Handle OAuth callback ─────────────────────────────────────────────────────
 qp = st.query_params
@@ -190,11 +192,23 @@ if "code" in qp and "realmId" in qp and "qb_token" not in st.session_state:
         st.query_params.clear()
         st.rerun()
     else:
-        st.error(f"OAuth failed: {tok.get('error_description', tok)}")
+        st.error(f"OAuth failed: {tok.get('error', 'unknown')} — {tok.get('error_description', str(tok))}")
+        st.caption(f"Client ID in use: `{CLIENT_ID[:12]}...` | Environment: `{ENV}`")
         st.stop()
 
 # ── Not connected ─────────────────────────────────────────────────────────────
 if "qb_token" not in st.session_state:
+    # Show refresh error if any (helps diagnose invalid_client)
+    refresh_err = st.session_state.pop("qb_refresh_error", None)
+    if refresh_err:
+        err_code = refresh_err.get("error", "unknown")
+        err_desc = refresh_err.get("error_description", str(refresh_err))
+        with st.expander("⚠️ Auto-connect failed — click for details"):
+            st.error(f"**{err_code}**: {err_desc}")
+            st.caption(f"Client ID in use: `{CLIENT_ID[:12]}...`")
+            st.caption(f"Environment: `{ENV}`")
+            st.caption(f"Refresh token prefix: `{_STORED_REFRESH[:12]}...`")
+
     _, mid, _ = st.columns([1, 2, 1])
     with mid:
         st.markdown(f"""

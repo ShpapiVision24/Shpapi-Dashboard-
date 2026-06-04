@@ -2,36 +2,8 @@ import streamlit as st
 import requests
 import base64
 import os
-import socket
-import subprocess
 from urllib.parse import urlencode
 from datetime import datetime
-
-# macOS DNS sometimes fails to resolve Intuit's CNAME chain — force Google DNS for QB hosts.
-# Store the true original once so re-runs don't create a recursive chain.
-_QB_HOSTS = {"quickbooks.api.intuit.com", "sandbox-quickbooks.api.intuit.com"}
-if not hasattr(socket, "_shpapi_orig_getaddrinfo"):
-    socket._shpapi_orig_getaddrinfo = socket.getaddrinfo
-
-_orig_getaddrinfo = socket._shpapi_orig_getaddrinfo
-
-def _qb_getaddrinfo(host, port, *args, **kwargs):
-    if host in _QB_HOSTS:
-        try:
-            out = subprocess.run(
-                ["nslookup", host, "8.8.8.8"],
-                capture_output=True, text=True, timeout=5
-            ).stdout
-            for line in out.splitlines():
-                if "Address:" in line and "#" not in line:
-                    ip = line.split("Address:")[-1].strip()
-                    if ip:
-                        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port or 443))]
-        except Exception:
-            pass
-    return _orig_getaddrinfo(host, port, *args, **kwargs)
-
-socket.getaddrinfo = _qb_getaddrinfo
 
 CLIENT_ID     = st.secrets["QB_CLIENT_ID"]
 CLIENT_SECRET = st.secrets["QB_CLIENT_SECRET"]

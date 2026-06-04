@@ -311,7 +311,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 with st.form("ai_form", clear_on_submit=True, border=False):
-    user_q    = st.text_input("", placeholder="Type your question here...", label_visibility="collapsed")
+    user_q    = st.text_input("Ask AI", placeholder="Type your question here...", label_visibility="collapsed")
     submitted = st.form_submit_button("Ask →", use_container_width=False)
     if submitted and user_q:
         st.session_state.ai_messages.append({"role": "user", "content": user_q})

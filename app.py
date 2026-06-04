@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import base64
 import os
 from datetime import timedelta
 from PIL import Image
@@ -50,6 +51,9 @@ from auth import check_password
 if not check_password():
     st.stop()
 
+if "ai_messages" not in st.session_state:
+    st.session_state.ai_messages = []
+
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -58,6 +62,8 @@ html, body, .stApp {{ background: {BG} !important; color: {T1}; }}
 #MainMenu, footer, header {{ visibility: hidden; }}
 .block-container {{ padding: 1.5rem 3rem 4rem 3rem !important; max-width: 100% !important; }}
 section[data-testid="stSidebar"] {{ display: none !important; }}
+button[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
 [data-testid="stSidebarNav"], [data-testid="stSidebarNavItems"],
 div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ display: none !important; }}
 ::-webkit-scrollbar {{ width: 6px; background: transparent; }}
@@ -86,7 +92,7 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
     border-radius: 16px;
     padding: 2rem;
     height: 100%;
-    min-height: 320px;
+    min-height: 280px;
     display: flex;
     flex-direction: column;
 }}
@@ -114,11 +120,6 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
     line-height: 1;
     margin-bottom: 1.2rem;
 }}
-.platform-sub {{
-    font-size: 0.75rem;
-    color: {T2};
-    margin-top: 0.3rem;
-}}
 .section {{ font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; color: {T3}; margin: 0 0 0.9rem 0; display: flex; align-items: center; gap: 1rem; }}
 .section::after {{ content: ''; flex: 1; height: 1px; background: {BORDER}; }}
 div[data-testid="stPageLink"] {{
@@ -126,7 +127,7 @@ div[data-testid="stPageLink"] {{
     padding: 0 !important; margin: 0 !important; padding-top: 1rem !important;
 }}
 a[data-testid="stPageLink-NavLink"] {{
-    color: {T2} !important; font-weight: 600 !important; font-size: 0.78rem !important;
+    color: {T2} !important; font-weight: 500 !important; font-size: 0.70rem !important;
     text-decoration: none !important; padding: 0.3rem 0.75rem !important;
     border-radius: 6px !important; background: transparent !important;
     border: none !important; display: inline-block !important;
@@ -135,10 +136,55 @@ a[data-testid="stPageLink-NavLink"]:hover {{
     background: rgba(59,130,246,0.15) !important; color: {BLUE} !important;
 }}
 a[data-testid="stPageLink-NavLink"] svg {{ display: none !important; }}
+/* AI chat messages */
+[data-testid="stChatMessageContent"] h1,
+[data-testid="stChatMessageContent"] h2,
+[data-testid="stChatMessageContent"] h3,
+[data-testid="stChatMessageContent"] h4 {{
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    margin: 0.5rem 0 0.15rem !important;
+    line-height: 1.4 !important;
+    color: {T1} !important;
+}}
+[data-testid="stChatMessageContent"] p,
+[data-testid="stChatMessageContent"] li {{
+    font-size: 0.82rem !important;
+    line-height: 1.6 !important;
+    margin: 0 !important;
+}}
+[data-testid="stChatMessageContent"] ul {{ margin: 0.25rem 0 0.25rem 1rem !important; padding: 0 !important; }}
+/* AI input box */
+div[data-testid="stForm"] input {{
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 10px !important;
+    color: {T1} !important;
+    font-size: 0.85rem !important;
+}}
+div[data-testid="stForm"] {{ border: none !important; }}
+/* Suggestion chip buttons */
+.chip-btn > button {{
+    border-radius: 20px !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: rgba(255,255,255,0.04) !important;
+    color: {T2} !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    padding: 0.4rem 1rem !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+}}
+.chip-btn > button:hover {{
+    background: rgba(59,130,246,0.12) !important;
+    border-color: rgba(59,130,246,0.4) !important;
+    color: {BLUE} !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
-_c_logo, _c_h, _c_m, _c_s, _c_g, _ = st.columns([1.5, 1, 1, 1, 1.2, 5])
+# Nav bar
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 3])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -150,10 +196,12 @@ with _c_s:
     st.page_link("pages/2_Shopify.py", label="Shopify")
 with _c_g:
     st.page_link("pages/3_Google_Ads.py", label="Google Ads")
+with _c_qb:
+    st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 2rem;"></div>', unsafe_allow_html=True)
 
 st.markdown(f"""
-<div style="margin-bottom:2.5rem;">
+<div style="margin-bottom:2rem;">
   <div style="font-size:1.4rem;font-weight:700;color:{T1};letter-spacing:-0.5px;">Analytics Hub</div>
   <div style="font-size:0.7rem;font-weight:500;text-transform:uppercase;letter-spacing:2px;color:{T3};margin-top:0.3rem;">Shpapi &nbsp;·&nbsp; All Platforms Overview</div>
 </div>
@@ -170,8 +218,8 @@ def get_meta_summary():
             timeout=15,
         )
         rows = r.json().get("data", [])
-        total_spend = sum(float(d.get("spend", 0)) for d in rows)
-        total_impr  = sum(int(d.get("impressions", 0)) for d in rows)
+        total_spend   = sum(float(d.get("spend", 0)) for d in rows)
+        total_impr    = sum(int(d.get("impressions", 0)) for d in rows)
         total_lclicks = 0
         for d in rows:
             for a in d.get("actions", []):
@@ -201,33 +249,81 @@ def get_shopify_summary():
     except:
         return None
 
-with st.spinner("Loading overview..."):
-    meta     = get_meta_summary()
-    shopify  = get_shopify_summary()
+@st.cache_data(ttl=3600)
+def get_qb_summary():
+    try:
+        import datetime as dt
+        client_id     = st.secrets["QB_CLIENT_ID"]
+        client_secret = st.secrets["QB_CLIENT_SECRET"]
+        refresh_token = st.secrets.get("QB_REFRESH_TOKEN", "")
+        realm_id      = st.secrets.get("QB_REALM_ID", "")
+        env           = st.secrets.get("QB_ENVIRONMENT", "sandbox")
+        if not refresh_token or not realm_id:
+            return None
+        creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+        r = requests.post(
+            "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+            headers={"Authorization": f"Basic {creds}", "Accept": "application/json"},
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            timeout=30,
+        )
+        token_data = r.json()
+        if "access_token" not in token_data:
+            return None
+        access_token = token_data["access_token"]
+        base_url = "https://quickbooks.api.intuit.com" if env == "production" else "https://sandbox-quickbooks.api.intuit.com"
+        now = dt.datetime.now()
+        r2 = requests.get(
+            f"{base_url}/v3/company/{realm_id}/reports/ProfitAndLoss",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            params={"start_date": f"{now.year}-01-01", "end_date": now.strftime("%Y-%m-%d"), "accounting_method": "Accrual"},
+            timeout=30,
+        )
+        report = r2.json()
+        net_income = None
+        for row in report.get("Rows", {}).get("Row", []):
+            if row.get("type") == "Section" and row.get("group") == "NetIncome":
+                cols = row.get("Summary", {}).get("ColData", [])
+                if len(cols) > 1:
+                    try:
+                        net_income = float(cols[1].get("value", 0))
+                    except Exception:
+                        pass
+        return {"net_income": net_income}
+    except Exception:
+        return None
 
+with st.spinner("Loading overview..."):
+    meta    = get_meta_summary()
+    shopify = get_shopify_summary()
+    qb      = get_qb_summary()
+
+# ── AI Growth Analyst (inline, above platform cards) ──────────────────────────
 st.markdown('<div class="section">AI Growth Analyst</div>', unsafe_allow_html=True)
 
 st.markdown(f"""
-<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;padding:1.5rem 1.5rem 1rem;margin-bottom:1.5rem;">
-  <div style="font-size:0.75rem;color:{T2};margin-bottom:1rem;">
+<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;
+            padding:1.25rem 1.5rem;margin-bottom:1rem;">
+  <div style="font-size:0.82rem;color:{T2};">
     Ask anything about your ads, revenue, or growth — powered by Claude AI.
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-if "ai_messages" not in st.session_state:
-    st.session_state.ai_messages = []
+with st.form("ai_form", clear_on_submit=True, border=False):
+    user_q    = st.text_input("", placeholder="Type your question here...", label_visibility="collapsed")
+    submitted = st.form_submit_button("Ask →", use_container_width=False)
+    if submitted and user_q:
+        st.session_state.ai_messages.append({"role": "user", "content": user_q})
 
 suggested = ["What are my top 3 growth opportunities?", "Why is my ROAS low?", "How can I improve my conversion rate?"]
 s1, s2, s3 = st.columns(3)
 for col, q in zip([s1, s2, s3], suggested):
     with col:
+        st.markdown('<div class="chip-btn">', unsafe_allow_html=True)
         if st.button(q, key=f"suggest_{q[:20]}", use_container_width=True):
             st.session_state.ai_messages.append({"role": "user", "content": q})
-
-user_q = st.chat_input("Ask your AI analyst...")
-if user_q:
-    st.session_state.ai_messages.append({"role": "user", "content": user_q})
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if st.session_state.ai_messages:
     for msg in st.session_state.ai_messages:
@@ -240,14 +336,16 @@ if st.session_state.ai_messages:
             with st.spinner("Analyzing your data..."):
                 try:
                     import anthropic as ac
-                    client = ac.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+                    client    = ac.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
                     meta_ctx  = f"Spend ${meta['spend']:,.2f} | Clicks {meta['clicks']:,} | Impressions {meta['impressions']:,}" if meta else "unavailable"
                     shop_ctx  = f"Revenue ${shopify['revenue_30d']:,.2f} (30d) | Orders {shopify['orders_30d']} (30d) | Total Orders All-Time {shopify['total_orders']}" if shopify else "unavailable"
+                    qb_ctx    = f"Net Income YTD ${qb['net_income']:,.2f}" if qb and qb.get("net_income") is not None else "unavailable"
                     system_p  = f"""You are a senior eCommerce growth analyst for Shpapi, a clothing and sunglasses brand.
 Current live data:
 - Meta Ads: {meta_ctx}
 - Shopify: {shop_ctx}
-Provide concise, actionable insights. Use bullet points. Focus on ROAS, CAC, conversion rate, and growth opportunities. Keep responses under 200 words."""
+- QuickBooks: {qb_ctx}
+Provide concise, actionable insights. Use **bold** for section titles, not markdown headers. Use bullet points. Focus on ROAS, CAC, conversion rate, and growth opportunities. Keep responses under 200 words."""
                     resp = client.messages.create(
                         model="claude-haiku-4-5-20251001",
                         max_tokens=512,
@@ -260,19 +358,21 @@ Provide concise, actionable insights. Use bullet points. Focus on ROAS, CAC, con
                 except Exception as e:
                     st.error(f"AI unavailable: {e}")
 
-if st.session_state.ai_messages:
     if st.button("Clear conversation", key="clear_ai"):
         st.session_state.ai_messages = []
         st.rerun()
 
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+
+# ── Platform Overview ─────────────────────────────────────────────────────────
 st.markdown('<div class="section">Platform Overview</div>', unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3, gap="large")
+col1, col2, col3, col4 = st.columns(4, gap="large")
 
 with col1:
-    meta_spend  = f"${meta['spend']:,.2f}"   if meta else "—"
-    meta_clicks = f"{meta['clicks']:,}"       if meta else "—"
-    meta_impr   = f"{meta['impressions']:,}"  if meta else "—"
+    meta_spend  = f"${meta['spend']:,.2f}"  if meta else "—"
+    meta_clicks = f"{meta['clicks']:,}"      if meta else "—"
+    meta_impr   = f"{meta['impressions']:,}" if meta else "—"
     st.markdown(f"""
     <div class="platform-card" style="border-top:3px solid #3b82f6;">
       <div class="platform-title">Meta Ads</div>
@@ -287,9 +387,9 @@ with col1:
     st.page_link("pages/1_Meta_Ads.py", label="View Meta Ads details →")
 
 with col2:
-    sh_rev    = f"${shopify['revenue_30d']:,.2f}"  if shopify else "—"
-    sh_orders = f"{shopify['orders_30d']:,}"         if shopify else "—"
-    sh_total  = f"{shopify['total_orders']:,}"        if shopify else "—"
+    sh_rev    = f"${shopify['revenue_30d']:,.2f}" if shopify else "—"
+    sh_orders = f"{shopify['orders_30d']:,}"       if shopify else "—"
+    sh_total  = f"{shopify['total_orders']:,}"     if shopify else "—"
     st.markdown(f"""
     <div class="platform-card" style="border-top:3px solid #22c55e;">
       <div class="platform-title">Shopify</div>
@@ -313,3 +413,28 @@ with col3:
       </div>
     </div>
     """, unsafe_allow_html=True)
+
+with col4:
+    if qb and qb.get("net_income") is not None:
+        ni      = qb["net_income"]
+        ni_str  = f"${ni:,.2f}"
+        ni_col  = "#22c55e" if ni >= 0 else "#ef4444"
+        st.markdown(f"""
+        <div class="platform-card" style="border-top:3px solid #f59e0b;">
+          <div class="platform-title">QuickBooks</div>
+          <div class="platform-metric-label">Net Income (YTD)</div>
+          <div class="platform-metric-value" style="color:{ni_col};">{ni_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.page_link("pages/4_QuickBooks.py", label="View QuickBooks details →")
+    else:
+        st.markdown(f"""
+        <div class="platform-card" style="border-top:3px solid #f59e0b;opacity:0.7;">
+          <div class="platform-title">QuickBooks</div>
+          <div style="text-align:center;padding:3rem 1rem;">
+            <div style="font-size:0.85rem;font-weight:600;color:{T2};margin-bottom:0.5rem;">Not Connected</div>
+            <div style="font-size:0.75rem;color:{T3};">Connect QuickBooks to view financial data.</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.page_link("pages/4_QuickBooks.py", label="Connect QuickBooks →")

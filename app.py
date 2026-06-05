@@ -340,12 +340,11 @@ if st.session_state.ai_messages:
                     meta_ctx  = f"Spend ${meta['spend']:,.2f} | Clicks {meta['clicks']:,} | Impressions {meta['impressions']:,}" if meta else "unavailable"
                     shop_ctx  = f"Revenue ${shopify['revenue_30d']:,.2f} (30d) | Orders {shopify['orders_30d']} (30d) | Total Orders All-Time {shopify['total_orders']}" if shopify else "unavailable"
                     qb_ctx    = f"Net Income YTD ${qb['net_income']:,.2f}" if qb and qb.get("net_income") is not None else "unavailable"
-                    system_p  = f"""You are a senior eCommerce growth analyst for Shpapi, a clothing and sunglasses brand.
+                    system_p  = f"""You are a growth analyst for Shpapi, a clothing and sunglasses brand. Speak directly and conversationally — like a smart advisor talking to the founder, not a consultant writing a report. No bullet points. No headers. Just clear, plain sentences that get straight to the point. Keep responses under 150 words.
 Current live data:
 - Meta Ads: {meta_ctx}
 - Shopify: {shop_ctx}
-- QuickBooks: {qb_ctx}
-Provide concise, actionable insights. Use **bold** for section titles, not markdown headers. Use bullet points. Focus on ROAS, CAC, conversion rate, and growth opportunities. Keep responses under 200 words."""
+- QuickBooks: {qb_ctx}"""
                     resp = client.messages.create(
                         model="claude-haiku-4-5-20251001",
                         max_tokens=512,

@@ -301,7 +301,7 @@ def get_instagram_summary():
         r = requests.get(
             "https://graph.facebook.com/v19.0/act_8429913163714900/insights",
             params={"fields": "spend,reach,impressions", "level": "account",
-                    "date_preset": "last_30d", "access_token": ACCESS_TOKEN},
+                    "date_preset": "maximum", "access_token": ACCESS_TOKEN},
             timeout=15,
         )
         d = r.json().get("data", [{}])[0]
@@ -461,7 +461,7 @@ with col5:
         st.markdown(f"""
         <div class="platform-card" style="border-top:3px solid #ec4899;">
           <div class="platform-title">Instagram Boosts</div>
-          <div class="platform-metric-label">Spend (Last 30d)</div>
+          <div class="platform-metric-label">Total Spend (All Time)</div>
           <div class="platform-metric-value">${instagram['spend']:,.2f}</div>
           <div class="platform-metric-label">Reach</div>
           <div class="platform-metric-value" style="font-size:1.2rem;">{instagram['reach']:,}</div>

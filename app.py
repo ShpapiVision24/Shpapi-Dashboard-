@@ -184,7 +184,7 @@ div[data-testid="stForm"] {{ border: none !important; }}
 """, unsafe_allow_html=True)
 
 # Nav bar
-_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 3])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 1.2, 1.8])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -198,6 +198,8 @@ with _c_g:
     st.page_link("pages/3_Google_Ads.py", label="Google Ads")
 with _c_qb:
     st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
+with _c_ig:
+    st.page_link("pages/5_Instagram.py", label="Instagram")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 2rem;"></div>', unsafe_allow_html=True)
 
 st.markdown(f"""
@@ -293,10 +295,26 @@ def get_qb_summary():
     except Exception:
         return None
 
+@st.cache_data(ttl=1800)
+def get_instagram_summary():
+    try:
+        r = requests.get(
+            "https://graph.facebook.com/v19.0/act_8429913163714900/insights",
+            params={"fields": "spend,reach,impressions", "level": "account",
+                    "date_preset": "last_30d", "access_token": ACCESS_TOKEN},
+            timeout=15,
+        )
+        d = r.json().get("data", [{}])[0]
+        return {"spend": float(d.get("spend", 0)), "reach": int(d.get("reach", 0)),
+                "impressions": int(d.get("impressions", 0))}
+    except:
+        return None
+
 with st.spinner("Loading overview..."):
-    meta    = get_meta_summary()
-    shopify = get_shopify_summary()
-    qb      = get_qb_summary()
+    meta      = get_meta_summary()
+    shopify   = get_shopify_summary()
+    qb        = get_qb_summary()
+    instagram = get_instagram_summary()
 
 # ── AI Growth Analyst (inline, above platform cards) ──────────────────────────
 st.markdown('<div class="section">AI Growth Analyst</div>', unsafe_allow_html=True)
@@ -366,7 +384,7 @@ st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 # ── Platform Overview ─────────────────────────────────────────────────────────
 st.markdown('<div class="section">Platform Overview</div>', unsafe_allow_html=True)
 
-col1, col2, col3, col4 = st.columns(4, gap="large")
+col1, col2, col3, col4, col5 = st.columns(5, gap="medium")
 
 with col1:
     meta_spend  = f"${meta['spend']:,.2f}"  if meta else "—"
@@ -437,3 +455,29 @@ with col4:
         </div>
         """, unsafe_allow_html=True)
         st.page_link("pages/4_QuickBooks.py", label="Connect QuickBooks →")
+
+with col5:
+    if instagram:
+        st.markdown(f"""
+        <div class="platform-card" style="border-top:3px solid #ec4899;">
+          <div class="platform-title">Instagram Boosts</div>
+          <div class="platform-metric-label">Spend (Last 30d)</div>
+          <div class="platform-metric-value">${instagram['spend']:,.2f}</div>
+          <div class="platform-metric-label">Reach</div>
+          <div class="platform-metric-value" style="font-size:1.2rem;">{instagram['reach']:,}</div>
+          <div class="platform-metric-label">Impressions</div>
+          <div class="platform-metric-value" style="font-size:1.2rem;">{instagram['impressions']:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.page_link("pages/5_Instagram.py", label="View Instagram details →")
+    else:
+        st.markdown(f"""
+        <div class="platform-card" style="border-top:3px solid #ec4899;opacity:0.7;">
+          <div class="platform-title">Instagram Boosts</div>
+          <div style="text-align:center;padding:3rem 1rem;">
+            <div style="font-size:0.85rem;font-weight:600;color:{T2};margin-bottom:0.5rem;">No Data</div>
+            <div style="font-size:0.75rem;color:{T3};">No boost activity in the last 30 days.</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.page_link("pages/5_Instagram.py", label="View Instagram →")

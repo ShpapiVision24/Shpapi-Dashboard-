@@ -77,7 +77,7 @@ div[data-testid="stPageLink"] {{
     padding: 0 !important; margin: 0 !important; padding-top: 1rem !important;
 }}
 a[data-testid="stPageLink-NavLink"] {{
-    color: {T2} !important; font-weight: 600 !important; font-size: 0.78rem !important;
+    color: {T2} !important; font-weight: 500 !important; font-size: 0.70rem !important;
     text-decoration: none !important; padding: 0.3rem 0.75rem !important;
     border-radius: 6px !important; background: transparent !important;
     border: none !important; display: inline-block !important;
@@ -89,7 +89,7 @@ a[data-testid="stPageLink-NavLink"] svg {{ display: none !important; }}
 </style>
 """, unsafe_allow_html=True)
 
-_c_logo, _c_h, _c_m, _c_s, _c_g, _ = st.columns([1.5, 1, 1, 1, 1.2, 5])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 1.2, 1.8])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -101,6 +101,10 @@ with _c_s:
     st.page_link("pages/2_Shopify.py", label="Shopify")
 with _c_g:
     st.page_link("pages/3_Google_Ads.py", label="Google Ads")
+with _c_qb:
+    st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
+with _c_ig:
+    st.page_link("pages/5_Instagram.py", label="Instagram")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 1.8rem;"></div>', unsafe_allow_html=True)
 
 st.markdown(f"""

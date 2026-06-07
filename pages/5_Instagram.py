@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import os
-import html as html_lib
+from datetime import datetime
 
 ASSETS    = os.path.join(os.path.dirname(__file__), "..", "assets")
 LOGO_CROP = os.path.join(ASSETS, "logo_cropped.png")
@@ -56,11 +56,12 @@ div[data-testid="stPageLink"] {{ border: none !important; background: none !impo
 a[data-testid="stPageLink-NavLink"] {{ color: {T2} !important; font-weight: 600 !important; font-size: 0.70rem !important; text-decoration: none !important; padding: 0.25rem 0.65rem !important; border-radius: 6px !important; background: transparent !important; border: none !important; display: inline-block !important; }}
 a[data-testid="stPageLink-NavLink"]:hover {{ background: rgba(59,130,246,0.15) !important; color: {BLUE} !important; }}
 a[data-testid="stPageLink-NavLink"] svg {{ display: none !important; }}
-.metric-row {{ display: grid; gap: 0.5rem; margin-bottom: 0.75rem; }}
-.metric-cell {{ background: rgba(255,255,255,0.03); border-radius: 8px; padding: 0.6rem 0.8rem; }}
-.metric-cell-label {{ font-size: 0.58rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: {T3}; margin-bottom: 0.2rem; }}
-.metric-cell-value {{ font-size: 0.9rem; font-weight: 700; color: {T1}; }}
-.divider {{ border-top: 1px solid {BORDER}; margin: 0.75rem 0; }}
+[data-testid="stMetric"] {{ background: rgba(255,255,255,0.03); border-radius: 8px; padding: 0.6rem 0.8rem !important; }}
+[data-testid="stMetricLabel"] p {{ font-size: 0.6rem !important; font-weight: 600 !important; text-transform: uppercase !important; letter-spacing: 1.4px !important; color: {T3} !important; }}
+[data-testid="stMetricValue"] {{ font-size: 0.95rem !important; font-weight: 700 !important; color: {T1} !important; }}
+[data-testid="stMetricDelta"] {{ display: none !important; }}
+[data-testid="stVerticalBlockBorderWrapper"] {{ background: {SURFACE} !important; border: 1px solid {BORDER} !important; border-radius: 14px !important; }}
+[data-testid="stVerticalBlockBorderWrapper"] > div {{ padding: 1rem 1.2rem !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -86,7 +87,7 @@ st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 2rem;"><
 st.markdown(f"""
 <div style="margin-bottom:2rem;">
   <div style="font-size:1.4rem;font-weight:700;color:{T1};letter-spacing:-0.5px;">Instagram Boosts</div>
-  <div style="font-size:0.7rem;font-weight:500;text-transform:uppercase;letter-spacing:2px;color:{T3};margin-top:0.3rem;">Shpapi &nbsp;·&nbsp; Sponsored Posts & Reels</div>
+  <div style="font-size:0.7rem;font-weight:500;text-transform:uppercase;letter-spacing:2px;color:{T3};margin-top:0.3rem;">Shpapi &nbsp;·&nbsp; Sponsored Posts &amp; Reels</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -123,7 +124,7 @@ def fetch_campaign_details():
     r = requests.get(
         f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/campaigns",
         params={
-            "fields": "id,name,status,effective_status,daily_budget,lifetime_budget,start_time,end_time,budget_remaining",
+            "fields": "id,name,effective_status,daily_budget,lifetime_budget,start_time,end_time",
             "limit": 200,
             "access_token": ACCESS_TOKEN,
         },
@@ -133,22 +134,25 @@ def fetch_campaign_details():
 
 def act(actions, atype):
     for a in (actions or []):
-        if a["action_type"] == atype:
+        if a.get("action_type") == atype:
             try: return int(float(a["value"]))
-            except: return 0
+            except: pass
     return 0
 
 def act_val(action_values, atype):
     for a in (action_values or []):
-        if a["action_type"] == atype:
+        if a.get("action_type") == atype:
             try: return float(a["value"])
-            except: return 0.0
+            except: pass
     return 0.0
 
-def fmt_val(v, prefix="", suffix="", zero="—"):
-    if v == 0: return zero
-    if prefix == "$": return f"${v:,.2f}{suffix}"
-    return f"{prefix}{v:,}{suffix}"
+def fmt_date(iso_str):
+    if not iso_str:
+        return ""
+    try:
+        return datetime.fromisoformat(iso_str.replace("Z", "+00:00")).strftime("%b %d, %Y")
+    except:
+        return iso_str[:10]
 
 with st.spinner("Loading Instagram data..."):
     campaigns  = fetch_insights(preset)
@@ -164,7 +168,7 @@ total_reach     = sum(int(c.get("reach", 0)) for c in campaigns)
 total_impr      = sum(int(c.get("impressions", 0)) for c in campaigns)
 total_purchases = sum(act(c.get("actions", []), "purchase") for c in campaigns)
 total_conv_val  = sum(act_val(c.get("action_values", []), "purchase") for c in campaigns)
-total_roas      = (total_conv_val / total_spend) if total_spend else 0
+total_roas      = round(total_conv_val / total_spend, 2) if total_spend else 0
 
 st.markdown('<div class="section">Overview</div>', unsafe_allow_html=True)
 st.markdown(f"""
@@ -186,7 +190,7 @@ st.markdown(f"""
     </div>
     <div class="kpi" style="border-top:3px solid {YELLOW};">
         <div class="kpi-label">Purchase ROAS</div>
-        <div class="kpi-value">{total_roas:.2f}x</div>
+        <div class="kpi-value">{total_roas}x</div>
         <div class="kpi-sub">${total_conv_val:,.2f} conv. value</div>
     </div>
 </div>
@@ -197,105 +201,89 @@ st.markdown('<div class="section">Boost Breakdown</div>', unsafe_allow_html=True
 
 for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True):
     cid     = c.get("campaign_id", "")
-    name    = html_lib.escape(c.get("campaign_name", "Unnamed boost"))
+    name    = c.get("campaign_name", "Unnamed boost")
     spend   = float(c.get("spend", 0))
     reach   = int(c.get("reach", 0))
     impr    = int(c.get("impressions", 0))
-    clicks  = int(c.get("clicks", 0))
     actions = c.get("actions", [])
     avals   = c.get("action_values", [])
 
-    video_views    = act(actions, "video_view")
-    purchases      = act(actions, "purchase")
-    checkouts      = act(actions, "initiate_checkout")
-    adds_to_cart   = act(actions, "add_to_cart")
-    content_views  = act(actions, "view_content")
-    link_clicks    = act(actions, "link_click")
-    conv_value     = act_val(avals, "purchase")
-    roas           = (conv_value / spend) if spend and conv_value else 0
-    cpp            = (spend / purchases) if purchases else 0
-    pct            = (spend / total_spend * 100) if total_spend else 0
+    video_views   = act(actions, "video_view")
+    purchases     = act(actions, "purchase")
+    checkouts     = act(actions, "initiate_checkout")
+    adds_to_cart  = act(actions, "add_to_cart")
+    content_views = act(actions, "view_content")
+    link_clicks   = act(actions, "link_click")
+    conv_value    = act_val(avals, "purchase")
+    roas          = round(conv_value / spend, 2) if spend and conv_value else 0
+    cpp           = round(spend / purchases, 2) if purchases else 0
+    pct           = round(spend / total_spend * 100) if total_spend else 0
 
-    # Campaign metadata
-    meta   = camp_meta.get(cid, {})
-    status = meta.get("effective_status", meta.get("status", "")).replace("_", " ").title()
-    lb     = int(meta.get("lifetime_budget", 0)) / 100
-    db     = int(meta.get("daily_budget", 0)) / 100
-    budget_str = f"${lb:,.0f} lifetime" if lb else (f"${db:,.0f}/day" if db else "—")
+    meta      = camp_meta.get(cid, {})
+    status    = meta.get("effective_status", "").replace("_", " ").title()
+    lb        = int(meta.get("lifetime_budget", 0)) / 100
+    db        = int(meta.get("daily_budget", 0)) / 100
+    budget_str = f"${lb:,.0f} lifetime" if lb else (f"${db:,.0f}/day" if db else "")
+    date_str  = fmt_date(meta.get("start_time", ""))
 
-    status_color = GREEN if status in ("Active",) else (YELLOW if "Pending" in status else T3)
+    status_color = GREEN if status == "Active" else (YELLOW if "Pending" in status or "Review" in status else T2)
 
-    st.markdown(f"""
-    <div style="background:{SURFACE};border:1px solid {BORDER};border-radius:14px;
-                padding:1.4rem 1.6rem;margin-bottom:1rem;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
-        <div style="font-size:0.9rem;font-weight:600;color:{T1};max-width:65%;line-height:1.4;">{name}</div>
-        <div style="text-align:right;">
-          <div style="font-size:1.15rem;font-weight:700;color:{PINK};">${spend:,.2f}</div>
-          <div style="font-size:0.68rem;color:{T3};">{pct:.0f}% of total spend</div>
-        </div>
-      </div>
+    with st.container(border=True):
+        # ── Header ────────────────────────────────────────────────────────────
+        hcol1, hcol2 = st.columns([4, 1])
+        with hcol1:
+            st.markdown(f'<div style="font-size:0.9rem;font-weight:600;color:{T1};line-height:1.4;margin-bottom:0.2rem;">{name}</div>', unsafe_allow_html=True)
+            meta_parts = []
+            if date_str:     meta_parts.append(f"Created {date_str}")
+            if status:       meta_parts.append(f'<span style="color:{status_color};font-weight:600;">{status}</span>')
+            if budget_str:   meta_parts.append(f"Budget: {budget_str}")
+            if pct:          meta_parts.append(f"{pct}% of total spend")
+            if meta_parts:
+                st.markdown(f'<div style="font-size:0.72rem;color:{T3};">{" &nbsp;·&nbsp; ".join(meta_parts)}</div>', unsafe_allow_html=True)
+        with hcol2:
+            st.markdown(f'<div style="text-align:right;font-size:1.15rem;font-weight:700;color:{PINK};padding-top:0.2rem;">${spend:,.2f}</div>', unsafe_allow_html=True)
 
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:1rem;">
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Reach</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(reach)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Impressions</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(impr)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Link Clicks</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(link_clicks)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Video Views</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(video_views)}</div>
-        </div>
-      </div>
+        st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.75rem 0 0.6rem;"></div>', unsafe_allow_html=True)
 
-      <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:{T3};margin-bottom:0.5rem;">Goal &amp; Conversions</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:1rem;">
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Purchases</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(purchases)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Cost / Purchase</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{"${:,.2f}".format(cpp) if cpp else "—"}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Conv. Value</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{"${:,.2f}".format(conv_value) if conv_value else "—"}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Purchase ROAS</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{GREEN if roas >= 1 else T1};">{"{}x".format(round(roas,2)) if roas else "—"}</div>
-        </div>
-      </div>
+        # ── Reach / Impressions / Clicks / Video (only non-zero) ──────────────
+        row1 = [(label, val) for label, val in [
+            ("Reach", f"{reach:,}" if reach else None),
+            ("Impressions", f"{impr:,}" if impr else None),
+            ("Link Clicks", f"{link_clicks:,}" if link_clicks else None),
+            ("Video Views", f"{video_views:,}" if video_views else None),
+        ] if val is not None]
 
-      <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:{T3};margin-bottom:0.5rem;">Funnel</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:1rem;">
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Content Views</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(content_views)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Adds to Cart</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(adds_to_cart)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
-          <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Checkouts</div>
-          <div style="font-size:0.95rem;font-weight:700;color:{T1};">{fmt_val(checkouts)}</div>
-        </div>
-      </div>
+        if row1:
+            cols = st.columns(len(row1))
+            for col, (label, val) in zip(cols, row1):
+                with col:
+                    st.metric(label, val)
 
-      <div style="border-top:1px solid {BORDER};padding-top:0.75rem;display:flex;gap:2rem;flex-wrap:wrap;">
-        <div><span style="font-size:0.65rem;color:{T3};">Status &nbsp;</span><span style="font-size:0.72rem;font-weight:600;color:{status_color};">{status or "—"}</span></div>
-        <div><span style="font-size:0.65rem;color:{T3};">Budget &nbsp;</span><span style="font-size:0.72rem;font-weight:600;color:{T2};">{budget_str}</span></div>
-        <div><span style="font-size:0.65rem;color:{T3};">Placements &nbsp;</span><span style="font-size:0.72rem;font-weight:600;color:{T2};">Instagram & Facebook</span></div>
-      </div>
+        # ── Goal & Conversions (only if any data) ─────────────────────────────
+        row2 = [(label, val) for label, val in [
+            ("Purchases", f"{purchases:,}" if purchases else None),
+            ("Cost/Purchase", f"${cpp:,.2f}" if cpp else None),
+            ("Conv. Value", f"${conv_value:,.2f}" if conv_value else None),
+            ("Purchase ROAS", f"{roas}x" if roas else None),
+        ] if val is not None]
 
-    </div>
-    """, unsafe_allow_html=True)
+        if row2:
+            st.markdown(f'<div style="font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:0.6rem 0 0.3rem;">Goal &amp; Conversions</div>', unsafe_allow_html=True)
+            cols = st.columns(len(row2))
+            for col, (label, val) in zip(cols, row2):
+                with col:
+                    st.metric(label, val)
+
+        # ── Funnel (only if any data) ─────────────────────────────────────────
+        row3 = [(label, val) for label, val in [
+            ("Content Views", f"{content_views:,}" if content_views else None),
+            ("Adds to Cart", f"{adds_to_cart:,}" if adds_to_cart else None),
+            ("Checkouts", f"{checkouts:,}" if checkouts else None),
+        ] if val is not None]
+
+        if row3:
+            st.markdown(f'<div style="font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:0.6rem 0 0.3rem;">Funnel</div>', unsafe_allow_html=True)
+            cols = st.columns(len(row3))
+            for col, (label, val) in zip(cols, row3):
+                with col:
+                    st.metric(label, val)

@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import os
+import html as html_lib
 
 ASSETS    = os.path.join(os.path.dirname(__file__), "..", "assets")
 LOGO_CROP = os.path.join(ASSETS, "logo_cropped.png")
@@ -196,7 +197,7 @@ st.markdown('<div class="section">Boost Breakdown</div>', unsafe_allow_html=True
 
 for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True):
     cid     = c.get("campaign_id", "")
-    name    = c.get("campaign_name", "Unnamed boost")
+    name    = html_lib.escape(c.get("campaign_name", "Unnamed boost"))
     spend   = float(c.get("spend", 0))
     reach   = int(c.get("reach", 0))
     impr    = int(c.get("impressions", 0))
@@ -227,8 +228,6 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
     st.markdown(f"""
     <div style="background:{SURFACE};border:1px solid {BORDER};border-radius:14px;
                 padding:1.4rem 1.6rem;margin-bottom:1rem;">
-
-      <!-- Header -->
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
         <div style="font-size:0.9rem;font-weight:600;color:{T1};max-width:65%;line-height:1.4;">{name}</div>
         <div style="text-align:right;">
@@ -237,7 +236,6 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
         </div>
       </div>
 
-      <!-- Reach / Impressions / Clicks / Video Views -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:1rem;">
         <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
           <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Reach</div>
@@ -257,8 +255,7 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
         </div>
       </div>
 
-      <!-- Goal & Conversions -->
-      <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:{T3};margin-bottom:0.5rem;">Goal & Conversions</div>
+      <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:{T3};margin-bottom:0.5rem;">Goal &amp; Conversions</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:1rem;">
         <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
           <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:{T3};margin-bottom:0.2rem;">Purchases</div>
@@ -278,7 +275,6 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
         </div>
       </div>
 
-      <!-- Funnel -->
       <div style="font-size:0.58rem;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:{T3};margin-bottom:0.5rem;">Funnel</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:1rem;">
         <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.6rem 0.8rem;">
@@ -295,7 +291,6 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
         </div>
       </div>
 
-      <!-- Details bar -->
       <div style="border-top:1px solid {BORDER};padding-top:0.75rem;display:flex;gap:2rem;flex-wrap:wrap;">
         <div><span style="font-size:0.65rem;color:{T3};">Status &nbsp;</span><span style="font-size:0.72rem;font-weight:600;color:{status_color};">{status or "—"}</span></div>
         <div><span style="font-size:0.65rem;color:{T3};">Budget &nbsp;</span><span style="font-size:0.72rem;font-weight:600;color:{T2};">{budget_str}</span></div>

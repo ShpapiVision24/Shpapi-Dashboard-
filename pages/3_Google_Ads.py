@@ -111,7 +111,7 @@ def fetch_google_ads_data(start_str, end_str):
             "client_id": cfg["client_id"],
             "client_secret": cfg["client_secret"],
             "refresh_token": cfg["refresh_token"],
-            "login_customer_id": cfg["manager_customer_id"].replace("-", ""),
+            "login_customer_id": cfg["client_customer_id"].replace("-", ""),
             "use_proto_plus": True,
         }
         client = GoogleAdsClient.load_from_dict(config)

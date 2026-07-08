@@ -85,7 +85,7 @@ st.markdown(f"""
 # ── Date range ────────────────────────────────────────────────────────────────
 col_l, col_r = st.columns([3, 1])
 with col_r:
-    preset = st.selectbox("Date range", ["Last 30 days", "Last 7 days", "Last 90 days", "This month"], label_visibility="collapsed")
+    preset = st.selectbox("Date range", ["Last 30 days", "Last 7 days", "Last 90 days", "This month", "All time"], label_visibility="collapsed")
 
 today = date.today()
 if preset == "Last 7 days":
@@ -94,6 +94,8 @@ elif preset == "Last 90 days":
     start_date = today - timedelta(days=90)
 elif preset == "This month":
     start_date = today.replace(day=1)
+elif preset == "All time":
+    start_date = date(2020, 1, 1)
 else:
     start_date = today - timedelta(days=30)
 end_date = today - timedelta(days=1)

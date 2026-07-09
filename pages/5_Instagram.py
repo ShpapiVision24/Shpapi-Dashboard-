@@ -223,14 +223,17 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
     effective = meta.get("effective_status", "")
     end_time_str = meta.get("end_time", "")
     now = datetime.now(timezone.utc)
-    if effective == "ACTIVE" and end_time_str:
-        try:
-            end_dt = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
-            status = "Active" if end_dt > now else "Ended"
-        except:
-            status = "Active"
-    elif effective == "ACTIVE":
-        status = "Active"
+    if effective == "ACTIVE":
+        ended = False
+        if end_time_str:
+            try:
+                ended = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")) <= now
+            except:
+                pass
+        lb_check = int(meta.get("lifetime_budget", 0)) / 100
+        if not ended and lb_check > 0 and spend >= lb_check * 0.98:
+            ended = True
+        status = "Ended" if ended else "Active"
     else:
         status = effective.replace("_", " ").title()
 

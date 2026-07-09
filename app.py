@@ -295,6 +295,43 @@ def get_qb_summary():
     except Exception:
         return None
 
+@st.cache_data(ttl=3600)
+def get_google_ads_summary():
+    try:
+        from google.ads.googleads.client import GoogleAdsClient
+        cfg = st.secrets["google_ads"]
+        config = {
+            "developer_token": cfg["developer_token"],
+            "client_id": cfg["client_id"],
+            "client_secret": cfg["client_secret"],
+            "refresh_token": cfg["refresh_token"],
+            "login_customer_id": cfg["client_customer_id"].replace("-", ""),
+            "use_proto_plus": True,
+        }
+        client = GoogleAdsClient.load_from_dict(config)
+        ga_service = client.get_service("GoogleAdsService")
+        customer_id = cfg["client_customer_id"].replace("-", "")
+        query = """
+            SELECT metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+            FROM campaign
+            WHERE segments.date BETWEEN '2020-01-01' AND '2099-12-31'
+              AND campaign.status != 'REMOVED'
+        """
+        response = ga_service.search(customer_id=customer_id, query=query)
+        total_spend = 0.0
+        total_clicks = 0
+        total_impressions = 0
+        total_conversions = 0.0
+        for row in response:
+            total_spend += row.metrics.cost_micros / 1_000_000
+            total_clicks += row.metrics.clicks
+            total_impressions += row.metrics.impressions
+            total_conversions += row.metrics.conversions
+        return {"spend": total_spend, "clicks": total_clicks,
+                "impressions": total_impressions, "conversions": total_conversions}
+    except Exception:
+        return None
+
 @st.cache_data(ttl=1800)
 def get_instagram_summary():
     try:
@@ -315,6 +352,7 @@ with st.spinner("Loading overview..."):
     shopify   = get_shopify_summary()
     qb        = get_qb_summary()
     instagram = get_instagram_summary()
+    google    = get_google_ads_summary()
 
 # ── AI Growth Analyst (inline, above platform cards) ──────────────────────────
 st.markdown('<div class="section">AI Growth Analyst</div>', unsafe_allow_html=True)
@@ -421,15 +459,33 @@ with col2:
     st.page_link("pages/2_Shopify.py", label="View Shopify details →")
 
 with col3:
-    st.markdown(f"""
-    <div class="platform-card" style="border-top:3px solid #8b5cf6;opacity:0.6;">
-      <div class="platform-title">Google Ads</div>
-      <div style="text-align:center;padding:3rem 1rem;">
-        <div style="font-size:0.85rem;font-weight:600;color:{T2};margin-bottom:0.5rem;">Coming Soon</div>
-        <div style="font-size:0.75rem;color:{T3};">Google Ads integration is being configured.</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    if google:
+        g_spend = f"${google['spend']:,.2f}"
+        g_clicks = f"{google['clicks']:,}"
+        g_impr = f"{google['impressions']:,}"
+        st.markdown(f"""
+        <div class="platform-card" style="border-top:3px solid #8b5cf6;">
+          <div class="platform-title">Google Ads</div>
+          <div class="platform-metric-label">Total Spend (All Time)</div>
+          <div class="platform-metric-value">{g_spend}</div>
+          <div class="platform-metric-label">Clicks</div>
+          <div class="platform-metric-value" style="font-size:1.2rem;">{g_clicks}</div>
+          <div class="platform-metric-label">Impressions</div>
+          <div class="platform-metric-value" style="font-size:1.2rem;">{g_impr}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.page_link("pages/3_Google_Ads.py", label="View Google Ads details →")
+    else:
+        st.markdown(f"""
+        <div class="platform-card" style="border-top:3px solid #8b5cf6;opacity:0.6;">
+          <div class="platform-title">Google Ads</div>
+          <div style="text-align:center;padding:3rem 1rem;">
+            <div style="font-size:0.85rem;font-weight:600;color:{T2};margin-bottom:0.5rem;">No Data</div>
+            <div style="font-size:0.75rem;color:{T3};">No campaign activity found.</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.page_link("pages/3_Google_Ads.py", label="View Google Ads →")
 
 with col4:
     if qb and qb.get("net_income") is not None:

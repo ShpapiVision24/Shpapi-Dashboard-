@@ -44,6 +44,11 @@ def check_password():
         display: none !important;
         visibility: hidden !important;
     }}
+    div[data-testid="stTextInput"] button,
+    div[data-baseweb="input"] button,
+    button[data-testid="InputInstructionsButton"] {{
+        display: none !important;
+    }}
     button[kind="primaryFormSubmit"] {{
         background: {BLUE} !important;
         border: none !important;

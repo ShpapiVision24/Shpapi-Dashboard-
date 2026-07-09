@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 ASSETS    = os.path.join(os.path.dirname(__file__), "..", "assets")
 LOGO_CROP = os.path.join(ASSETS, "logo_cropped.png")
@@ -220,13 +220,26 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
     pct           = round(spend / total_spend * 100) if total_spend else 0
 
     meta      = camp_meta.get(cid, {})
-    status    = meta.get("effective_status", "").replace("_", " ").title()
+    effective = meta.get("effective_status", "")
+    end_time_str = meta.get("end_time", "")
+    now = datetime.now(timezone.utc)
+    if effective == "ACTIVE" and end_time_str:
+        try:
+            end_dt = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+            status = "Active" if end_dt > now else "Ended"
+        except:
+            status = "Active"
+    elif effective == "ACTIVE":
+        status = "Active"
+    else:
+        status = effective.replace("_", " ").title()
+
     lb        = int(meta.get("lifetime_budget", 0)) / 100
     db        = int(meta.get("daily_budget", 0)) / 100
     budget_str = f"${lb:,.0f} lifetime" if lb else (f"${db:,.0f}/day" if db else "")
     date_str  = fmt_date(meta.get("start_time", ""))
 
-    status_color = GREEN if status == "Active" else (YELLOW if "Pending" in status or "Review" in status else T2)
+    status_color = GREEN if status == "Active" else (YELLOW if "Pending" in status or "Review" in status else T3)
 
     with st.container(border=True):
         # ── Header ────────────────────────────────────────────────────────────

@@ -37,6 +37,13 @@ def check_password():
         border-radius: 8px !important;
         color: #fff !important;
     }}
+    input[type="password"]::-ms-reveal,
+    input[type="password"]::-ms-clear,
+    input::-webkit-credentials-auto-fill-button,
+    input::-webkit-contacts-auto-fill-button {{
+        display: none !important;
+        visibility: hidden !important;
+    }}
     button[kind="primaryFormSubmit"] {{
         background: {BLUE} !important;
         border: none !important;

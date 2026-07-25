@@ -135,6 +135,30 @@ def fetch_campaign_details():
     )
     return {c["id"]: c for c in r.json().get("data", [])}
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_thumbnails():
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/ads",
+            params={
+                "fields": "campaign_id,creative{thumbnail_url,image_url}",
+                "limit": 200,
+                "access_token": ACCESS_TOKEN,
+            },
+            timeout=15,
+        )
+        thumbs = {}
+        for ad in r.json().get("data", []):
+            cid = ad.get("campaign_id")
+            if cid and cid not in thumbs:
+                creative = ad.get("creative", {})
+                url = creative.get("thumbnail_url") or creative.get("image_url")
+                if url:
+                    thumbs[cid] = url
+        return thumbs
+    except Exception:
+        return {}
+
 def act(actions, atype):
     for a in (actions or []):
         if a.get("action_type") == atype:
@@ -178,6 +202,7 @@ def fmt_date(iso_str):
 with st.spinner("Loading Instagram data..."):
     campaigns  = fetch_insights(preset)
     camp_meta  = fetch_campaign_details()
+    thumbnails = fetch_thumbnails()
 
 if not campaigns:
     st.info("No boost data found for this period.")
@@ -269,18 +294,26 @@ for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""),
 
     status_color = GREEN if status == "Active" else (YELLOW if "Pending" in status or "Review" in status else T3)
 
+    thumb_url = thumbnails.get(cid, "")
     with st.container(border=True):
         # ── Header ────────────────────────────────────────────────────────────
         hcol1, hcol2 = st.columns([4, 1])
         with hcol1:
-            st.markdown(f'<div style="font-size:0.9rem;font-weight:600;color:{T1};line-height:1.4;margin-bottom:0.2rem;">{name}</div>', unsafe_allow_html=True)
+            thumb_html = f'<img src="{thumb_url}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin-right:0.85rem;flex-shrink:0;" />' if thumb_url else ''
             meta_parts = []
             if date_str:     meta_parts.append(f"Created {date_str}")
             if status:       meta_parts.append(f'<span style="color:{status_color};font-weight:600;">{status}</span>')
             if budget_str:   meta_parts.append(f"Budget: {budget_str}")
             if pct:          meta_parts.append(f"{pct}% of total spend")
-            if meta_parts:
-                st.markdown(f'<div style="font-size:0.72rem;color:{T3};">{" &nbsp;·&nbsp; ".join(meta_parts)}</div>', unsafe_allow_html=True)
+            meta_html = f'<div style="font-size:0.72rem;color:{T3};margin-top:0.2rem;">{" &nbsp;·&nbsp; ".join(meta_parts)}</div>' if meta_parts else ''
+            st.markdown(f'''
+            <div style="display:flex;align-items:center;">
+              {thumb_html}
+              <div>
+                <div style="font-size:0.9rem;font-weight:600;color:{T1};line-height:1.4;">{name}</div>
+                {meta_html}
+              </div>
+            </div>''', unsafe_allow_html=True)
         with hcol2:
             st.markdown(f'<div style="text-align:right;font-size:1.15rem;font-weight:700;color:{PINK};padding-top:0.2rem;">${spend:,.2f}</div>', unsafe_allow_html=True)
 

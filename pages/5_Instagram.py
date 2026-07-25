@@ -146,6 +146,24 @@ def act_val(action_values, atype):
             except: pass
     return 0.0
 
+METRIC_HELP = {
+    "Reach":         "How many unique people saw your ad. Each person is counted once no matter how many times they saw it.",
+    "Impressions":   "Total times your ad appeared on someone's screen. One person seeing it 5 times counts as 5 impressions.",
+    "Link Clicks":   "How many times someone clicked the link in your ad to visit your website or product page.",
+    "Video Views":   "How many times your video was watched for at least 3 seconds.",
+    "Purchases":     "Number of sales that happened after someone saw or clicked your ad.",
+    "Cost/Purchase": "Average amount you spent on ads to get one sale. Lower is better.",
+    "Conv. Value":   "Total revenue from purchases that came through your ad.",
+    "Purchase ROAS": "Return on Ad Spend — for every $1 you spent, how many dollars came back in sales. 2x means you earned $2 for every $1 spent.",
+    "Content Views": "How many times people visited your product page after seeing your ad.",
+    "Adds to Cart":  "How many people added a product to their cart after seeing your ad.",
+    "Checkouts":     "How many people started the checkout process after seeing your ad.",
+    "Total Spend":   "Total money spent on this campaign.",
+    "CTR":           "Click-Through Rate — percentage of people who saw your ad and clicked on it. Higher is better.",
+    "Avg CPC":       "Average Cost Per Click — how much you paid on average for each click.",
+    "Conversions":   "Total number of purchases or desired actions completed after seeing your ad.",
+}
+
 def fmt_date(iso_str):
     if not iso_str:
         return ""
@@ -277,7 +295,7 @@ for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""),
             cols = st.columns(len(row1))
             for col, (label, val) in zip(cols, row1):
                 with col:
-                    st.metric(label, val)
+                    st.metric(label, val, help=METRIC_HELP.get(label))
 
         # ── Goal & Conversions (only if any data) ─────────────────────────────
         row2 = [(label, val) for label, val in [
@@ -292,7 +310,7 @@ for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""),
             cols = st.columns(len(row2))
             for col, (label, val) in zip(cols, row2):
                 with col:
-                    st.metric(label, val)
+                    st.metric(label, val, help=METRIC_HELP.get(label))
 
         # ── Funnel (only if any data) ─────────────────────────────────────────
         row3 = [(label, val) for label, val in [
@@ -306,4 +324,4 @@ for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""),
             cols = st.columns(len(row3))
             for col, (label, val) in zip(cols, row3):
                 with col:
-                    st.metric(label, val)
+                    st.metric(label, val, help=METRIC_HELP.get(label))

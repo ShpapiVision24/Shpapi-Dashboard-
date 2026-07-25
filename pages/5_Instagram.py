@@ -40,7 +40,10 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
 ::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.15); border-radius: 3px; }}
 .kpi-grid {{ display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 2rem; }}
 .kpi {{ background: {SURFACE}; border: 1px solid {BORDER}; border-radius: 12px; padding: 1.4rem 1.6rem 1.3rem; }}
-.kpi-label {{ font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.8px; color: {T3}; margin-bottom: 0.65rem; }}
+.kpi-label {{ font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.8px; color: {T3}; margin-bottom: 0.65rem; position: relative; }}
+.tip {{ display: inline-block; cursor: help; color: rgba(255,255,255,0.25); font-size: 0.6rem; margin-left: 4px; vertical-align: middle; position: relative; }}
+.tip .tiptext {{ visibility: hidden; opacity: 0; width: 210px; background: #1a2f50; color: rgba(255,255,255,0.85); font-size: 0.7rem; font-weight: 400; line-height: 1.45; text-align: left; border-radius: 8px; padding: 8px 10px; border: 1px solid rgba(255,255,255,0.1); position: absolute; z-index: 9999; bottom: 140%; left: 50%; transform: translateX(-50%); transition: opacity 0.15s; pointer-events: none; text-transform: none; letter-spacing: 0; }}
+.tip:hover .tiptext {{ visibility: visible; opacity: 1; }}
 .kpi-value {{ font-size: 2rem; font-weight: 700; color: #ffffff; letter-spacing: -1px; line-height: 1; }}
 .kpi-sub {{ font-size: 0.72rem; color: {T2}; margin-top: 0.4rem; }}
 .section {{ font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; color: {T3}; margin: 0 0 0.9rem 0; display: flex; align-items: center; gap: 1rem; }}
@@ -192,22 +195,22 @@ st.markdown('<div class="section">Overview</div>', unsafe_allow_html=True)
 st.markdown(f"""
 <div class="kpi-grid">
     <div class="kpi" style="border-top:3px solid {PINK};">
-        <div class="kpi-label">Total Spend</div>
+        <div class="kpi-label">Total Spend <span class="tip">ⓘ<span class="tiptext">Total money spent on all boosts during the selected time period.</span></span></div>
         <div class="kpi-value">${total_spend:,.2f}</div>
         <div class="kpi-sub">{sel}</div>
     </div>
     <div class="kpi" style="border-top:3px solid {GREEN};">
-        <div class="kpi-label">Reach</div>
+        <div class="kpi-label">Reach <span class="tip">ⓘ<span class="tiptext">How many unique people saw your ads. Each person is counted once, no matter how many times they saw it.</span></span></div>
         <div class="kpi-value">{total_reach:,}</div>
         <div class="kpi-sub">Unique accounts reached</div>
     </div>
     <div class="kpi" style="border-top:3px solid {BLUE};">
-        <div class="kpi-label">Impressions</div>
+        <div class="kpi-label">Impressions <span class="tip">ⓘ<span class="tiptext">Total times your ads appeared on screen. One person seeing it 5 times counts as 5 impressions.</span></span></div>
         <div class="kpi-value">{total_impr:,}</div>
         <div class="kpi-sub">Total views</div>
     </div>
     <div class="kpi" style="border-top:3px solid {YELLOW};">
-        <div class="kpi-label">Purchase ROAS</div>
+        <div class="kpi-label">Purchase ROAS <span class="tip">ⓘ<span class="tiptext">Return on Ad Spend — for every $1 you spent on ads, how many dollars came back in sales. 2x means you earned $2 for every $1 spent.</span></span></div>
         <div class="kpi-value">{total_roas}x</div>
         <div class="kpi-sub">${total_conv_val:,.2f} conv. value</div>
     </div>

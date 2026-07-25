@@ -124,7 +124,7 @@ def fetch_campaign_details():
     r = requests.get(
         f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/campaigns",
         params={
-            "fields": "id,name,effective_status,daily_budget,lifetime_budget,start_time,end_time",
+            "fields": "id,name,effective_status,daily_budget,lifetime_budget,start_time,end_time,stop_time",
             "limit": 200,
             "access_token": ACCESS_TOKEN,
         },
@@ -199,7 +199,7 @@ st.markdown(f"""
 # ── Per-boost breakdown ───────────────────────────────────────────────────────
 st.markdown('<div class="section">Boost Breakdown</div>', unsafe_allow_html=True)
 
-for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True):
+for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""), {}).get("created_time", ""), reverse=True):
     cid     = c.get("campaign_id", "")
     name    = c.get("campaign_name", "Unnamed boost")
     spend   = float(c.get("spend", 0))
@@ -221,7 +221,7 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
 
     meta      = camp_meta.get(cid, {})
     effective = meta.get("effective_status", "")
-    end_time_str = meta.get("end_time", "")
+    end_time_str = meta.get("end_time", "") or meta.get("stop_time", "")
     now = datetime.now(timezone.utc)
     if effective == "ACTIVE":
         ended = False
@@ -234,6 +234,10 @@ for c in sorted(campaigns, key=lambda x: float(x.get("spend", 0)), reverse=True)
         if not ended and lb_check > 0 and spend >= lb_check * 0.98:
             ended = True
         status = "Ended" if ended else "Active"
+    elif effective == "PAUSED":
+        status = "Paused"
+    elif effective in ("DELETED", "ARCHIVED"):
+        status = "Ended"
     else:
         status = effective.replace("_", " ").title()
 

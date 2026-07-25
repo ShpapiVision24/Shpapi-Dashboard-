@@ -101,7 +101,7 @@ sel    = st.selectbox("Date range", list(DATE_PRESETS.keys()), index=3, label_vi
 preset = DATE_PRESETS[sel]
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_insights(preset):
     rows, url = [], f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/insights"
     params = {
@@ -119,7 +119,7 @@ def fetch_insights(preset):
         params = {}
     return rows
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_campaign_details():
     r = requests.get(
         f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/campaigns",

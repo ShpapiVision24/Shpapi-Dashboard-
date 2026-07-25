@@ -42,7 +42,11 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
 ::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.15); border-radius: 3px; }}
 .kpi-grid {{ display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1rem; }}
 .kpi {{ background: {SURFACE}; border: 1px solid {BORDER}; border-radius: 12px; padding: 1.4rem 1.6rem 1.3rem; }}
-.kpi-label {{ font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.8px; color: {T3}; margin-bottom: 0.65rem; }}
+.kpi-label {{ font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.8px; color: {T3}; margin-bottom: 0.65rem; position: relative; }}
+.stat-label {{ font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.8px; color: {T3}; margin-bottom: 0.4rem; position: relative; }}
+.tip {{ display: inline-block; cursor: help; color: rgba(255,255,255,0.25); font-size: 0.6rem; margin-left: 4px; vertical-align: middle; position: relative; }}
+.tip .tiptext {{ visibility: hidden; opacity: 0; width: 220px; background: #1a2f50; color: rgba(255,255,255,0.85); font-size: 0.7rem; font-weight: 400; line-height: 1.45; text-align: left; border-radius: 8px; padding: 8px 10px; border: 1px solid rgba(255,255,255,0.1); position: absolute; z-index: 9999; bottom: 140%; left: 50%; transform: translateX(-50%); transition: opacity 0.15s; pointer-events: none; text-transform: none; letter-spacing: 0; }}
+.tip:hover .tiptext {{ visibility: visible; opacity: 1; }}
 .kpi-value {{ font-size: 2rem; font-weight: 700; color: #ffffff; letter-spacing: -1px; line-height: 1; }}
 .kpi-value.gold {{ color: {GOLD}; }}
 .stat-grid {{ display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 2.4rem; }}
@@ -263,24 +267,27 @@ if not df.empty:
     roas_str        = f"{roas:.2f}x" if roas else "—"
     cpa_str         = f"${cpa:,.2f}" if has_conv else "—"
 
+    def tip(text):
+        return f'<span class="tip">ⓘ<span class="tiptext">{text}</span></span>'
+
     st.markdown(f"""
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-label">Total Purchases</div><div class="kpi-value gold">{total_purchases:,}</div></div>
-      <div class="kpi"><div class="kpi-label">Revenue</div><div class="kpi-value gold">${total_revenue:,.2f}</div></div>
-      <div class="kpi"><div class="kpi-label">ROAS</div><div class="kpi-value">{roas_str}</div></div>
-      <div class="kpi"><div class="kpi-label">Total Spend</div><div class="kpi-value">${total_spend:,.2f}</div></div>
+      <div class="kpi"><div class="kpi-label">Total Purchases {tip("Number of sales that happened after someone saw or clicked your ad.")}</div><div class="kpi-value gold">{total_purchases:,}</div></div>
+      <div class="kpi"><div class="kpi-label">Revenue {tip("Total money earned from purchases that came through your Meta ads.")}</div><div class="kpi-value gold">${total_revenue:,.2f}</div></div>
+      <div class="kpi"><div class="kpi-label">ROAS {tip("Return on Ad Spend — for every $1 you spent, how many dollars came back in sales. 2x means you earned $2 for every $1 spent.")}</div><div class="kpi-value">{roas_str}</div></div>
+      <div class="kpi"><div class="kpi-label">Total Spend {tip("Total money spent on all Meta ad campaigns.")}</div><div class="kpi-value">${total_spend:,.2f}</div></div>
     </div>
     <div class="stat-grid">
-      <div class="stat"><div class="stat-label">Impressions</div><div class="stat-value">{total_impr:,}</div></div>
-      <div class="stat"><div class="stat-label">Link Clicks</div><div class="stat-value">{total_lclicks:,}</div></div>
-      <div class="stat"><div class="stat-label">Landing Page Views</div><div class="stat-value">{total_lpv:,}</div></div>
-      <div class="stat"><div class="stat-label">Product Views</div><div class="stat-value">{total_pviews:,}</div></div>
+      <div class="stat"><div class="stat-label">Impressions {tip("Total times your ads appeared on screen. One person seeing it 5 times counts as 5 impressions.")}</div><div class="stat-value">{total_impr:,}</div></div>
+      <div class="stat"><div class="stat-label">Link Clicks {tip("How many times someone clicked the link in your ad to visit your website.")}</div><div class="stat-value">{total_lclicks:,}</div></div>
+      <div class="stat"><div class="stat-label">Landing Page Views {tip("How many times someone actually loaded your website after clicking. Lower than clicks means some people left before the page fully loaded.")}</div><div class="stat-value">{total_lpv:,}</div></div>
+      <div class="stat"><div class="stat-label">Product Views {tip("How many times someone viewed a specific product page on your website after seeing your ad.")}</div><div class="stat-value">{total_pviews:,}</div></div>
     </div>
     <div class="stat-grid">
-      <div class="stat"><div class="stat-label">Avg CTR</div><div class="stat-value">{avg_ctr:.2f}%</div></div>
-      <div class="stat"><div class="stat-label">Avg CPC</div><div class="stat-value">${avg_cpc:,.2f}</div></div>
-      <div class="stat"><div class="stat-label">Avg CPM</div><div class="stat-value">${avg_cpm:,.2f}</div></div>
-      <div class="stat"><div class="stat-label">Avg CPA</div><div class="stat-value">{cpa_str}</div></div>
+      <div class="stat"><div class="stat-label">Avg CTR {tip("Click-Through Rate — percentage of people who saw your ad and clicked it. Higher is better. Industry average is around 1–2%.")}</div><div class="stat-value">{avg_ctr:.2f}%</div></div>
+      <div class="stat"><div class="stat-label">Avg CPC {tip("Average Cost Per Click — how much you paid on average for each click. Lower is better.")}</div><div class="stat-value">${avg_cpc:,.2f}</div></div>
+      <div class="stat"><div class="stat-label">Avg CPM {tip("Cost Per 1,000 Impressions — how much it costs to show your ad 1,000 times. Useful for comparing how expensive different audiences are.")}</div><div class="stat-value">${avg_cpm:,.2f}</div></div>
+      <div class="stat"><div class="stat-label">Avg CPA {tip("Cost Per Acquisition — average amount spent to get one purchase. Lower is better.")}</div><div class="stat-value">{cpa_str}</div></div>
     </div>
     """, unsafe_allow_html=True)
 

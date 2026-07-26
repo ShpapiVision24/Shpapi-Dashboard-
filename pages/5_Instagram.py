@@ -1,7 +1,8 @@
 import streamlit as st
 import requests
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
+import json
 
 ASSETS    = os.path.join(os.path.dirname(__file__), "..", "assets")
 LOGO_CROP = os.path.join(ASSETS, "logo_cropped.png")
@@ -65,6 +66,12 @@ a[data-testid="stPageLink-NavLink"] svg {{ display: none !important; }}
 [data-testid="stMetricDelta"] {{ display: none !important; }}
 [data-testid="stVerticalBlockBorderWrapper"] {{ background: {SURFACE} !important; border: 1px solid {BORDER} !important; border-radius: 14px !important; }}
 [data-testid="stVerticalBlockBorderWrapper"] > div {{ padding: 1rem 1.2rem !important; }}
+button[kind="primaryFormSubmit"] {{
+    background: {BLUE} !important; border: none !important; border-radius: 8px !important;
+    color: #fff !important; font-weight: 700 !important; font-size: 0.85rem !important;
+    margin-top: 0.5rem;
+}}
+button[kind="primaryFormSubmit"]:hover {{ background: #2563eb !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -361,3 +368,247 @@ for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""),
             for col, (label, val) in zip(cols, row3):
                 with col:
                     st.metric(label, val, help=METRIC_HELP.get(label))
+
+# ── Create New Boost ──────────────────────────────────────────────────────────
+st.markdown(f"""
+<div style="margin:3rem 0 1.5rem;border-top:2px solid {BORDER};padding-top:2rem;">
+  <div style="font-size:1.3rem;font-weight:700;color:{T1};letter-spacing:-0.4px;">Create New Boost</div>
+  <div style="font-size:0.72rem;color:{T3};margin-top:0.25rem;">Promote an existing Instagram post or Reel directly from your dashboard</div>
+</div>
+""", unsafe_allow_html=True)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_ig_account():
+    try:
+        r = requests.get(
+            "https://graph.facebook.com/v19.0/me/accounts",
+            params={"fields": "id,name,instagram_business_account", "access_token": ACCESS_TOKEN},
+            timeout=15,
+        )
+        for page in r.json().get("data", []):
+            ig = page.get("instagram_business_account", {})
+            if ig.get("id"):
+                return ig["id"], page["id"]
+    except Exception:
+        pass
+    return None, None
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_ig_recent_media(ig_uid):
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v19.0/{ig_uid}/media",
+            params={
+                "fields": "id,caption,media_type,thumbnail_url,media_url,timestamp",
+                "limit": 24,
+                "access_token": ACCESS_TOKEN,
+            },
+            timeout=15,
+        )
+        return r.json().get("data", [])
+    except Exception:
+        return []
+
+with st.spinner("Loading your Instagram posts…"):
+    ig_uid, page_id = fetch_ig_account()
+
+if not ig_uid:
+    st.warning("Could not find a linked Instagram business account. Make sure your Facebook Page is connected to your Instagram account in Meta Business Suite.")
+else:
+    media_list = fetch_ig_recent_media(ig_uid)
+    if not media_list:
+        st.info("No recent Instagram posts found.")
+    else:
+        st.markdown('<div class="section">1 · Pick a post</div>', unsafe_allow_html=True)
+        if "boost_media_id" not in st.session_state:
+            st.session_state["boost_media_id"] = None
+
+        n_cols = 6
+        for row_start in range(0, min(len(media_list), 18), n_cols):
+            row_items = media_list[row_start:row_start + n_cols]
+            cols = st.columns(n_cols)
+            for col, item in zip(cols, row_items):
+                mid   = item["id"]
+                thumb = item.get("thumbnail_url") or item.get("media_url") or ""
+                is_sel = st.session_state["boost_media_id"] == mid
+                with col:
+                    border_style = f"3px solid {PINK}" if is_sel else f"2px solid {BORDER}"
+                    if thumb:
+                        st.markdown(
+                            f'<div style="border:{border_style};border-radius:10px;overflow:hidden;margin-bottom:4px;">'
+                            f'<img src="{thumb}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;" />'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+                    if st.button("✓ Selected" if is_sel else "Select", key=f"bp_{mid}", use_container_width=True):
+                        st.session_state["boost_media_id"] = mid
+                        st.rerun()
+
+        sel_id = st.session_state.get("boost_media_id")
+        if sel_id:
+            selected_item = next((m for m in media_list if m["id"] == sel_id), None)
+            if selected_item:
+                st.markdown(f'<div style="margin:1.5rem 0 0.5rem;"></div>', unsafe_allow_html=True)
+                st.markdown('<div class="section">2 · Boost settings</div>', unsafe_allow_html=True)
+                prev_thumb   = selected_item.get("thumbnail_url") or selected_item.get("media_url") or ""
+                prev_caption = selected_item.get("caption") or "No caption"
+
+                c_left, c_right = st.columns([1, 3])
+                with c_left:
+                    if prev_thumb:
+                        st.image(prev_thumb, use_container_width=True)
+                    st.markdown(
+                        f'<div style="font-size:0.72rem;color:{T2};margin-top:0.4rem;">'
+                        f'{prev_caption[:120]}{"…" if len(prev_caption) > 120 else ""}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                with c_right:
+                    with st.form("boost_form"):
+                        default_name  = f"Boost · {prev_caption[:40]}…" if len(prev_caption) > 40 else f"Boost · {prev_caption}"
+                        campaign_name = st.text_input("Campaign name", value=default_name)
+
+                        fc1, fc2 = st.columns(2)
+                        with fc1:
+                            goal = st.selectbox("Goal", [
+                                "Reach more people",
+                                "Get more engagement",
+                                "Drive website traffic",
+                            ])
+                        with fc2:
+                            cta_btn = st.selectbox("Call to action button", [
+                                "LEARN_MORE", "SHOP_NOW", "CONTACT_US", "WATCH_MORE", "BOOK_TRAVEL",
+                            ])
+
+                        fb1, fb2 = st.columns(2)
+                        with fb1:
+                            budget_usd  = st.number_input("Budget ($)", min_value=1.0, max_value=50000.0, value=50.0, step=5.0)
+                        with fb2:
+                            budget_type = st.radio("Budget type", ["Lifetime", "Daily"], horizontal=True)
+
+                        fd1, fd2 = st.columns(2)
+                        with fd1:
+                            start_dt = st.date_input("Start date", value=date.today())
+                        with fd2:
+                            end_dt   = st.date_input("End date",   value=date.today() + timedelta(days=7))
+
+                        fa1, fa2, fa3 = st.columns(3)
+                        with fa1:
+                            age_min = st.number_input("Min age", min_value=18, max_value=64, value=18, step=1)
+                        with fa2:
+                            age_max = st.number_input("Max age", min_value=19, max_value=65, value=55, step=1)
+                        with fa3:
+                            country = st.selectbox("Country", [
+                                "US", "CA", "GB", "AU", "MX", "BR", "ES", "FR", "DE", "IT", "JP", "KR",
+                            ])
+
+                        launched = st.form_submit_button("Launch Boost", use_container_width=True, type="primary")
+
+                        if launched:
+                            errs = []
+                            if not campaign_name.strip():     errs.append("Campaign name is required.")
+                            if end_dt <= start_dt:            errs.append("End date must be after start date.")
+                            if int(age_max) <= int(age_min):  errs.append("Max age must be greater than min age.")
+                            if errs:
+                                for e in errs:
+                                    st.error(e)
+                            else:
+                                GOAL_MAP = {
+                                    "Reach more people":     ("OUTCOME_AWARENESS",  "REACH"),
+                                    "Get more engagement":   ("OUTCOME_ENGAGEMENT", "POST_ENGAGEMENT"),
+                                    "Drive website traffic": ("OUTCOME_TRAFFIC",    "LINK_CLICKS"),
+                                }
+                                objective, opt_goal = GOAL_MAP[goal]
+                                budget_cents = int(budget_usd * 100)
+                                start_ts = int(datetime(start_dt.year, start_dt.month, start_dt.day, 0, 0, tzinfo=timezone.utc).timestamp())
+                                end_ts   = int(datetime(end_dt.year,   end_dt.month,   end_dt.day,  23, 59, tzinfo=timezone.utc).timestamp())
+
+                                with st.spinner("Launching boost…"):
+                                    try:
+                                        # 1 — Campaign
+                                        cr = requests.post(
+                                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/campaigns",
+                                            data={
+                                                "name": campaign_name,
+                                                "objective": objective,
+                                                "status": "ACTIVE",
+                                                "special_ad_categories": "[]",
+                                                "access_token": ACCESS_TOKEN,
+                                            },
+                                            timeout=30,
+                                        ).json()
+                                        if "error" in cr:
+                                            st.error(f"Campaign error: {cr['error']['message']}")
+                                            st.stop()
+                                        campaign_id = cr["id"]
+
+                                        # 2 — Ad Set
+                                        asp = {
+                                            "name": f"{campaign_name} — Ad Set",
+                                            "campaign_id": campaign_id,
+                                            "billing_event": "IMPRESSIONS",
+                                            "optimization_goal": opt_goal,
+                                            "targeting": json.dumps({
+                                                "age_min": int(age_min),
+                                                "age_max": int(age_max),
+                                                "geo_locations": {"countries": [country]},
+                                            }),
+                                            "instagram_actor_id": ig_uid,
+                                            "start_time": str(start_ts),
+                                            "end_time": str(end_ts),
+                                            "access_token": ACCESS_TOKEN,
+                                        }
+                                        if budget_type == "Lifetime":
+                                            asp["lifetime_budget"] = str(budget_cents)
+                                        else:
+                                            asp["daily_budget"] = str(budget_cents)
+
+                                        ar = requests.post(
+                                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/adsets",
+                                            data=asp, timeout=30,
+                                        ).json()
+                                        if "error" in ar:
+                                            st.error(f"Ad set error: {ar['error']['message']}")
+                                            st.stop()
+                                        adset_id = ar["id"]
+
+                                        # 3 — Creative
+                                        ccr = requests.post(
+                                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/adcreatives",
+                                            data={
+                                                "name": f"{campaign_name} — Creative",
+                                                "instagram_actor_id": ig_uid,
+                                                "source_instagram_media_id": sel_id,
+                                                "call_to_action": json.dumps({"type": cta_btn}),
+                                                "access_token": ACCESS_TOKEN,
+                                            },
+                                            timeout=30,
+                                        ).json()
+                                        if "error" in ccr:
+                                            st.error(f"Creative error: {ccr['error']['message']}")
+                                            st.stop()
+                                        creative_id = ccr["id"]
+
+                                        # 4 — Ad
+                                        adr = requests.post(
+                                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/ads",
+                                            data={
+                                                "name": f"{campaign_name} — Ad",
+                                                "adset_id": adset_id,
+                                                "creative": json.dumps({"creative_id": creative_id}),
+                                                "status": "ACTIVE",
+                                                "access_token": ACCESS_TOKEN,
+                                            },
+                                            timeout=30,
+                                        ).json()
+                                        if "error" in adr:
+                                            st.error(f"Ad error: {adr['error']['message']}")
+                                            st.stop()
+
+                                        st.success(f"Boost launched! Campaign ID: {campaign_id}")
+                                        st.balloons()
+                                        st.session_state["boost_media_id"] = None
+                                        st.cache_data.clear()
+
+                                    except Exception as ex:
+                                        st.error(f"Something went wrong: {str(ex)}")

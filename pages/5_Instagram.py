@@ -124,10 +124,12 @@ def fetch_insights(preset):
     while url:
         r    = requests.get(url, params=params, timeout=15)
         data = r.json()
+        if "error" in data:
+            return [], data["error"].get("message", "Unknown API error")
         rows.extend(data.get("data", []))
         url    = data.get("paging", {}).get("next")
         params = {}
-    return rows
+    return rows, None
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_campaign_details():
@@ -207,24 +209,24 @@ def fmt_date(iso_str):
         return iso_str[:10]
 
 with st.spinner("Loading Instagram data..."):
-    campaigns  = fetch_insights(preset)
+    campaigns, api_error = fetch_insights(preset)
     camp_meta  = fetch_campaign_details()
     thumbnails = fetch_thumbnails()
 
-if not campaigns:
+if api_error:
+    st.error(f"Instagram API error: {api_error}")
+elif not campaigns:
     st.info("No boost data found for this period.")
-    st.stop()
 
-# ── Summary KPIs ──────────────────────────────────────────────────────────────
-total_spend     = sum(float(c.get("spend", 0)) for c in campaigns)
-total_reach     = sum(int(c.get("reach", 0)) for c in campaigns)
-total_impr      = sum(int(c.get("impressions", 0)) for c in campaigns)
-total_purchases = sum(act(c.get("actions", []), "purchase") for c in campaigns)
-total_conv_val  = sum(act_val(c.get("action_values", []), "purchase") for c in campaigns)
-total_roas      = round(total_conv_val / total_spend, 2) if total_spend else 0
+if campaigns:
+    total_spend     = sum(float(c.get("spend", 0)) for c in campaigns)
+    total_reach     = sum(int(c.get("reach", 0)) for c in campaigns)
+    total_impr      = sum(int(c.get("impressions", 0)) for c in campaigns)
+    total_conv_val  = sum(act_val(c.get("action_values", []), "purchase") for c in campaigns)
+    total_roas      = round(total_conv_val / total_spend, 2) if total_spend else 0
 
-st.markdown('<div class="section">Overview</div>', unsafe_allow_html=True)
-st.markdown(f"""
+    st.markdown('<div class="section">Overview</div>', unsafe_allow_html=True)
+    st.markdown(f"""
 <div class="kpi-grid">
     <div class="kpi" style="border-top:3px solid {PINK};">
         <div class="kpi-label">Total Spend <span class="tip">ⓘ<span class="tiptext">Total money spent on all boosts during the selected time period.</span></span></div>
@@ -249,125 +251,117 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Per-boost breakdown ───────────────────────────────────────────────────────
-st.markdown('<div class="section">Boost Breakdown</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">Boost Breakdown</div>', unsafe_allow_html=True)
 
-for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""), {}).get("created_time", ""), reverse=True):
-    cid     = c.get("campaign_id", "")
-    name    = c.get("campaign_name", "Unnamed boost")
-    spend   = float(c.get("spend", 0))
-    reach   = int(c.get("reach", 0))
-    impr    = int(c.get("impressions", 0))
-    actions = c.get("actions", [])
-    avals   = c.get("action_values", [])
+    for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""), {}).get("created_time", ""), reverse=True):
+        cid     = c.get("campaign_id", "")
+        name    = c.get("campaign_name", "Unnamed boost")
+        spend   = float(c.get("spend", 0))
+        reach   = int(c.get("reach", 0))
+        impr    = int(c.get("impressions", 0))
+        actions = c.get("actions", [])
+        avals   = c.get("action_values", [])
 
-    video_views   = act(actions, "video_view")
-    purchases     = act(actions, "purchase")
-    checkouts     = act(actions, "initiate_checkout")
-    adds_to_cart  = act(actions, "add_to_cart")
-    content_views = act(actions, "view_content")
-    link_clicks   = act(actions, "link_click")
-    conv_value    = act_val(avals, "purchase")
-    roas          = round(conv_value / spend, 2) if spend and conv_value else 0
-    cpp           = round(spend / purchases, 2) if purchases else 0
-    pct           = round(spend / total_spend * 100) if total_spend else 0
+        video_views   = act(actions, "video_view")
+        purchases     = act(actions, "purchase")
+        checkouts     = act(actions, "initiate_checkout")
+        adds_to_cart  = act(actions, "add_to_cart")
+        content_views = act(actions, "view_content")
+        link_clicks   = act(actions, "link_click")
+        conv_value    = act_val(avals, "purchase")
+        roas          = round(conv_value / spend, 2) if spend and conv_value else 0
+        cpp           = round(spend / purchases, 2) if purchases else 0
+        pct           = round(spend / total_spend * 100) if total_spend else 0
 
-    meta      = camp_meta.get(cid, {})
-    effective = meta.get("effective_status", "")
-    end_time_str = meta.get("end_time", "") or meta.get("stop_time", "")
-    now = datetime.now(timezone.utc)
-    if effective == "ACTIVE":
-        ended = False
-        if end_time_str:
-            try:
-                ended = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")) <= now
-            except:
-                pass
-        lb_check = int(meta.get("lifetime_budget", 0)) / 100
-        if not ended and lb_check > 0 and spend >= lb_check * 0.98:
-            ended = True
-        status = "Ended" if ended else "Active"
-    elif effective == "PAUSED":
-        status = "Paused"
-    elif effective in ("DELETED", "ARCHIVED"):
-        status = "Ended"
-    else:
-        status = effective.replace("_", " ").title()
+        meta         = camp_meta.get(cid, {})
+        effective    = meta.get("effective_status", "")
+        end_time_str = meta.get("end_time", "") or meta.get("stop_time", "")
+        now          = datetime.now(timezone.utc)
+        if effective == "ACTIVE":
+            ended = False
+            if end_time_str:
+                try:
+                    ended = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")) <= now
+                except:
+                    pass
+            lb_check = int(meta.get("lifetime_budget", 0)) / 100
+            if not ended and lb_check > 0 and spend >= lb_check * 0.98:
+                ended = True
+            status = "Ended" if ended else "Active"
+        elif effective == "PAUSED":
+            status = "Paused"
+        elif effective in ("DELETED", "ARCHIVED"):
+            status = "Ended"
+        else:
+            status = effective.replace("_", " ").title()
 
-    lb        = int(meta.get("lifetime_budget", 0)) / 100
-    db        = int(meta.get("daily_budget", 0)) / 100
-    budget_str = f"${lb:,.0f} lifetime" if lb else (f"${db:,.0f}/day" if db else "")
-    date_str  = fmt_date(meta.get("start_time", ""))
+        lb         = int(meta.get("lifetime_budget", 0)) / 100
+        db         = int(meta.get("daily_budget", 0)) / 100
+        budget_str = f"${lb:,.0f} lifetime" if lb else (f"${db:,.0f}/day" if db else "")
+        date_str   = fmt_date(meta.get("start_time", ""))
 
-    status_color = GREEN if status == "Active" else (YELLOW if "Pending" in status or "Review" in status else T3)
+        status_color = GREEN if status == "Active" else (YELLOW if "Pending" in status or "Review" in status else T3)
+        thumb_url    = thumbnails.get(cid, "")
 
-    thumb_url = thumbnails.get(cid, "")
-    with st.container(border=True):
-        # ── Header ────────────────────────────────────────────────────────────
-        hcol1, hcol2 = st.columns([4, 1])
-        with hcol1:
-            thumb_html = f'<img src="{thumb_url}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin-right:0.85rem;flex-shrink:0;" />' if thumb_url else ''
-            meta_parts = []
-            if date_str:     meta_parts.append(f"Created {date_str}")
-            if status:       meta_parts.append(f'<span style="color:{status_color};font-weight:600;">{status}</span>')
-            if budget_str:   meta_parts.append(f"Budget: {budget_str}")
-            if pct:          meta_parts.append(f"{pct}% of total spend")
-            meta_html = f'<div style="font-size:0.72rem;color:{T3};margin-top:0.2rem;">{" &nbsp;·&nbsp; ".join(meta_parts)}</div>' if meta_parts else ''
-            st.markdown(f'''
-            <div style="display:flex;align-items:center;">
-              {thumb_html}
-              <div>
-                <div style="font-size:0.9rem;font-weight:600;color:{T1};line-height:1.4;">{name}</div>
-                {meta_html}
-              </div>
-            </div>''', unsafe_allow_html=True)
-        with hcol2:
-            st.markdown(f'<div style="text-align:right;font-size:1.15rem;font-weight:700;color:{PINK};padding-top:0.2rem;">${spend:,.2f}</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            hcol1, hcol2 = st.columns([4, 1])
+            with hcol1:
+                thumb_html = f'<img src="{thumb_url}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin-right:0.85rem;flex-shrink:0;" />' if thumb_url else ''
+                meta_parts = []
+                if date_str:   meta_parts.append(f"Created {date_str}")
+                if status:     meta_parts.append(f'<span style="color:{status_color};font-weight:600;">{status}</span>')
+                if budget_str: meta_parts.append(f"Budget: {budget_str}")
+                if pct:        meta_parts.append(f"{pct}% of total spend")
+                meta_html = f'<div style="font-size:0.72rem;color:{T3};margin-top:0.2rem;">{" &nbsp;·&nbsp; ".join(meta_parts)}</div>' if meta_parts else ''
+                st.markdown(f'''
+                <div style="display:flex;align-items:center;">
+                  {thumb_html}
+                  <div>
+                    <div style="font-size:0.9rem;font-weight:600;color:{T1};line-height:1.4;">{name}</div>
+                    {meta_html}
+                  </div>
+                </div>''', unsafe_allow_html=True)
+            with hcol2:
+                st.markdown(f'<div style="text-align:right;font-size:1.15rem;font-weight:700;color:{PINK};padding-top:0.2rem;">${spend:,.2f}</div>', unsafe_allow_html=True)
 
-        st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.75rem 0 0.6rem;"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.75rem 0 0.6rem;"></div>', unsafe_allow_html=True)
 
-        # ── Reach / Impressions / Clicks / Video (only non-zero) ──────────────
-        row1 = [(label, val) for label, val in [
-            ("Reach", f"{reach:,}" if reach else None),
-            ("Impressions", f"{impr:,}" if impr else None),
-            ("Link Clicks", f"{link_clicks:,}" if link_clicks else None),
-            ("Video Views", f"{video_views:,}" if video_views else None),
-        ] if val is not None]
+            row1 = [(label, val) for label, val in [
+                ("Reach",       f"{reach:,}"       if reach       else None),
+                ("Impressions", f"{impr:,}"         if impr        else None),
+                ("Link Clicks", f"{link_clicks:,}"  if link_clicks else None),
+                ("Video Views", f"{video_views:,}"  if video_views else None),
+            ] if val is not None]
+            if row1:
+                cols = st.columns(len(row1))
+                for col, (label, val) in zip(cols, row1):
+                    with col:
+                        st.metric(label, val, help=METRIC_HELP.get(label))
 
-        if row1:
-            cols = st.columns(len(row1))
-            for col, (label, val) in zip(cols, row1):
-                with col:
-                    st.metric(label, val, help=METRIC_HELP.get(label))
+            row2 = [(label, val) for label, val in [
+                ("Purchases",     f"{purchases:,}"      if purchases  else None),
+                ("Cost/Purchase", f"${cpp:,.2f}"         if cpp        else None),
+                ("Conv. Value",   f"${conv_value:,.2f}"  if conv_value else None),
+                ("Purchase ROAS", f"{roas}x"             if roas       else None),
+            ] if val is not None]
+            if row2:
+                st.markdown(f'<div style="font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:0.6rem 0 0.3rem;">Goal &amp; Conversions</div>', unsafe_allow_html=True)
+                cols = st.columns(len(row2))
+                for col, (label, val) in zip(cols, row2):
+                    with col:
+                        st.metric(label, val, help=METRIC_HELP.get(label))
 
-        # ── Goal & Conversions (only if any data) ─────────────────────────────
-        row2 = [(label, val) for label, val in [
-            ("Purchases", f"{purchases:,}" if purchases else None),
-            ("Cost/Purchase", f"${cpp:,.2f}" if cpp else None),
-            ("Conv. Value", f"${conv_value:,.2f}" if conv_value else None),
-            ("Purchase ROAS", f"{roas}x" if roas else None),
-        ] if val is not None]
-
-        if row2:
-            st.markdown(f'<div style="font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:0.6rem 0 0.3rem;">Goal &amp; Conversions</div>', unsafe_allow_html=True)
-            cols = st.columns(len(row2))
-            for col, (label, val) in zip(cols, row2):
-                with col:
-                    st.metric(label, val, help=METRIC_HELP.get(label))
-
-        # ── Funnel (only if any data) ─────────────────────────────────────────
-        row3 = [(label, val) for label, val in [
-            ("Content Views", f"{content_views:,}" if content_views else None),
-            ("Adds to Cart", f"{adds_to_cart:,}" if adds_to_cart else None),
-            ("Checkouts", f"{checkouts:,}" if checkouts else None),
-        ] if val is not None]
-
-        if row3:
-            st.markdown(f'<div style="font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:0.6rem 0 0.3rem;">Funnel</div>', unsafe_allow_html=True)
-            cols = st.columns(len(row3))
-            for col, (label, val) in zip(cols, row3):
-                with col:
-                    st.metric(label, val, help=METRIC_HELP.get(label))
+            row3 = [(label, val) for label, val in [
+                ("Content Views", f"{content_views:,}" if content_views else None),
+                ("Adds to Cart",  f"{adds_to_cart:,}"  if adds_to_cart  else None),
+                ("Checkouts",     f"{checkouts:,}"      if checkouts     else None),
+            ] if val is not None]
+            if row3:
+                st.markdown(f'<div style="font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:0.6rem 0 0.3rem;">Funnel</div>', unsafe_allow_html=True)
+                cols = st.columns(len(row3))
+                for col, (label, val) in zip(cols, row3):
+                    with col:
+                        st.metric(label, val, help=METRIC_HELP.get(label))
 
 # ── Create New Boost ──────────────────────────────────────────────────────────
 st.markdown(f"""

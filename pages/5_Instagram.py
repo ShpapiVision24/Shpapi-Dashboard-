@@ -445,193 +445,194 @@ elif ig_uid:
     if media_error or not media_list:
         media_list = fetch_ad_creatives()
 
-if media_list:
-    st.markdown('<div class="section">1 · Pick a post</div>', unsafe_allow_html=True)
-    if "boost_media_id" not in st.session_state:
-        st.session_state["boost_media_id"] = None
+if "boost_media_id" not in st.session_state:
+    st.session_state["boost_media_id"] = None
 
+if media_list:
+    # ── Post picker grid ──────────────────────────────────────────────────────
+    st.markdown('<div class="section">1 · Pick a post to boost</div>', unsafe_allow_html=True)
     n_cols = 6
     for row_start in range(0, min(len(media_list), 18), n_cols):
         row_items = media_list[row_start:row_start + n_cols]
         cols = st.columns(n_cols)
         for col, item in zip(cols, row_items):
-            mid   = item["id"]
-            thumb = item.get("thumbnail_url") or item.get("media_url") or ""
+            mid    = item["id"]
+            thumb  = item.get("thumbnail_url") or item.get("media_url") or ""
             is_sel = st.session_state["boost_media_id"] == mid
             with col:
                 border_style = f"3px solid {PINK}" if is_sel else f"2px solid {BORDER}"
                 if thumb:
                     st.markdown(
-                        f'<div style="border:{border_style};border-radius:10px;overflow:hidden;margin-bottom:4px;">'
+                        f'<div style="border:{border_style};border-radius:10px;overflow:hidden;margin-bottom:4px;cursor:pointer;">'
                         f'<img src="{thumb}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;" />'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
-                if st.button("✓ Selected" if is_sel else "Select", key=f"bp_{mid}", use_container_width=True):
+                if st.button("✓" if is_sel else "Select", key=f"bp_{mid}", use_container_width=True):
                     st.session_state["boost_media_id"] = mid
                     st.rerun()
 
-    sel_id = st.session_state.get("boost_media_id")
-    if sel_id:
-        selected_item = next((m for m in media_list if m["id"] == sel_id), None)
-        if selected_item:
-            st.markdown(f'<div style="margin:1.5rem 0 0.5rem;"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="section">2 · Boost settings</div>', unsafe_allow_html=True)
-            prev_thumb   = selected_item.get("thumbnail_url") or selected_item.get("media_url") or ""
-            prev_caption = selected_item.get("caption") or "No caption"
+sel_id = st.session_state.get("boost_media_id")
+selected_item = next((m for m in media_list if m["id"] == sel_id), None) if sel_id and media_list else None
 
-            c_left, c_right = st.columns([1, 3])
-            with c_left:
-                if prev_thumb:
-                    st.image(prev_thumb, use_container_width=True)
-                st.markdown(
-                    f'<div style="font-size:0.72rem;color:{T2};margin-top:0.4rem;">'
-                    f'{prev_caption[:120]}{"…" if len(prev_caption) > 120 else ""}</div>',
-                    unsafe_allow_html=True,
-                )
+if selected_item:
+    prev_thumb   = selected_item.get("thumbnail_url") or selected_item.get("media_url") or ""
+    prev_caption = selected_item.get("caption") or ""
 
-            with c_right:
-                with st.form("boost_form"):
-                    default_name  = f"Boost · {prev_caption[:40]}…" if len(prev_caption) > 40 else f"Boost · {prev_caption}"
-                    campaign_name = st.text_input("Campaign name", value=default_name)
+    st.markdown(f'<div style="margin:2rem 0 0.5rem;border-top:1px solid {BORDER};padding-top:1.5rem;"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">2 · Boost settings</div>', unsafe_allow_html=True)
 
-                    fc1, fc2 = st.columns(2)
-                    with fc1:
-                        goal = st.selectbox("Goal", [
-                            "Reach more people",
-                            "Get more engagement",
-                            "Drive website traffic",
-                        ])
-                    with fc2:
-                        cta_btn = st.selectbox("Call to action button", [
-                            "LEARN_MORE", "SHOP_NOW", "CONTACT_US", "WATCH_MORE", "BOOK_TRAVEL",
-                        ])
+    col_form, col_preview = st.columns([3, 2])
 
-                    fb1, fb2 = st.columns(2)
-                    with fb1:
-                        budget_usd  = st.number_input("Budget ($)", min_value=1.0, max_value=50000.0, value=50.0, step=5.0)
-                    with fb2:
-                        budget_type = st.radio("Budget type", ["Lifetime", "Daily"], horizontal=True)
+    with col_form:
+        with st.form("boost_form"):
+            campaign_name = st.text_input("Campaign name", value=f"Boost · {prev_caption[:40]}…" if len(prev_caption) > 40 else f"Boost · {prev_caption}" if prev_caption else "New Boost")
 
-                    fd1, fd2 = st.columns(2)
-                    with fd1:
-                        start_dt = st.date_input("Start date", value=date.today())
-                    with fd2:
-                        end_dt   = st.date_input("End date",   value=date.today() + timedelta(days=7))
+            st.markdown(f'<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:1rem 0 0.4rem;">Goal</div>', unsafe_allow_html=True)
+            goal = st.radio("Goal", [
+                "Reach more people",
+                "More website traffic",
+                "More engagement",
+            ], label_visibility="collapsed")
 
-                    fa1, fa2, fa3 = st.columns(3)
-                    with fa1:
-                        age_min = st.number_input("Min age", min_value=18, max_value=64, value=18, step=1)
-                    with fa2:
-                        age_max = st.number_input("Max age", min_value=19, max_value=65, value=55, step=1)
-                    with fa3:
-                        country = st.selectbox("Country", [
-                            "US", "CA", "GB", "AU", "MX", "BR", "ES", "FR", "DE", "IT", "JP", "KR",
-                        ])
+            st.markdown(f'<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:1rem 0 0.4rem;">Call to action</div>', unsafe_allow_html=True)
+            cta_btn = st.selectbox("CTA", ["LEARN_MORE", "SHOP_NOW", "CONTACT_US", "WATCH_MORE", "BOOK_TRAVEL"], label_visibility="collapsed")
 
-                    launched = st.form_submit_button("Launch Boost", use_container_width=True, type="primary")
+            st.markdown(f'<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:1rem 0 0.4rem;">Budget & Duration</div>', unsafe_allow_html=True)
+            fb1, fb2, fb3 = st.columns(3)
+            with fb1:
+                budget_usd  = st.number_input("Budget ($)", min_value=1.0, max_value=50000.0, value=50.0, step=5.0, label_visibility="collapsed")
+                st.caption("Budget (USD)")
+            with fb2:
+                budget_type = st.selectbox("Type", ["Lifetime", "Daily"], label_visibility="collapsed")
+                st.caption("Budget type")
+            with fb3:
+                duration_days = st.number_input("Days", min_value=1, max_value=90, value=7, step=1, label_visibility="collapsed")
+                st.caption("Duration (days)")
 
-                    if launched:
-                        errs = []
-                        if not campaign_name.strip():     errs.append("Campaign name is required.")
-                        if end_dt <= start_dt:            errs.append("End date must be after start date.")
-                        if int(age_max) <= int(age_min):  errs.append("Max age must be greater than min age.")
-                        if errs:
-                            for e in errs:
-                                st.error(e)
+            start_dt = date.today()
+            end_dt   = start_dt + timedelta(days=int(duration_days))
+            st.markdown(f'<div style="font-size:0.72rem;color:{T3};margin-top:-0.5rem;">{start_dt.strftime("%b %d")} → {end_dt.strftime("%b %d, %Y")}</div>', unsafe_allow_html=True)
+
+            st.markdown(f'<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:1rem 0 0.4rem;">Audience</div>', unsafe_allow_html=True)
+            fa1, fa2, fa3 = st.columns(3)
+            with fa1:
+                age_min = st.number_input("Min age", min_value=18, max_value=64, value=18, step=1)
+            with fa2:
+                age_max = st.number_input("Max age", min_value=19, max_value=65, value=55, step=1)
+            with fa3:
+                country = st.selectbox("Country", ["US","CA","GB","AU","MX","BR","ES","FR","DE","IT","JP","KR"])
+
+            launched = st.form_submit_button("Launch Boost", use_container_width=True, type="primary")
+
+            if launched:
+                GOAL_MAP = {
+                    "Reach more people":    ("OUTCOME_AWARENESS",  "REACH"),
+                    "More website traffic": ("OUTCOME_TRAFFIC",    "LINK_CLICKS"),
+                    "More engagement":      ("OUTCOME_ENGAGEMENT", "POST_ENGAGEMENT"),
+                }
+                objective, opt_goal = GOAL_MAP[goal]
+                budget_cents = int(budget_usd * 100)
+                start_ts = int(datetime(start_dt.year, start_dt.month, start_dt.day, 0, 0, tzinfo=timezone.utc).timestamp())
+                end_ts   = int(datetime(end_dt.year,   end_dt.month,   end_dt.day,  23, 59, tzinfo=timezone.utc).timestamp())
+
+                with st.spinner("Launching boost…"):
+                    try:
+                        cr = requests.post(
+                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/campaigns",
+                            data={"name": campaign_name, "objective": objective,
+                                  "status": "ACTIVE", "special_ad_categories": "[]",
+                                  "access_token": ACCESS_TOKEN},
+                            timeout=30,
+                        ).json()
+                        if "error" in cr:
+                            st.error(f"Campaign error: {cr['error']['message']}")
+                            st.stop()
+                        campaign_id = cr["id"]
+
+                        asp = {
+                            "name": f"{campaign_name} — Ad Set",
+                            "campaign_id": campaign_id,
+                            "billing_event": "IMPRESSIONS",
+                            "optimization_goal": opt_goal,
+                            "targeting": json.dumps({
+                                "age_min": int(age_min), "age_max": int(age_max),
+                                "geo_locations": {"countries": [country]},
+                            }),
+                            "start_time": str(start_ts),
+                            "end_time": str(end_ts),
+                            "access_token": ACCESS_TOKEN,
+                        }
+                        if ig_uid:
+                            asp["instagram_actor_id"] = ig_uid
+                        if budget_type == "Lifetime":
+                            asp["lifetime_budget"] = str(budget_cents)
                         else:
-                            GOAL_MAP = {
-                                "Reach more people":     ("OUTCOME_AWARENESS",  "REACH"),
-                                "Get more engagement":   ("OUTCOME_ENGAGEMENT", "POST_ENGAGEMENT"),
-                                "Drive website traffic": ("OUTCOME_TRAFFIC",    "LINK_CLICKS"),
-                            }
-                            objective, opt_goal = GOAL_MAP[goal]
-                            budget_cents = int(budget_usd * 100)
-                            start_ts = int(datetime(start_dt.year, start_dt.month, start_dt.day, 0, 0, tzinfo=timezone.utc).timestamp())
-                            end_ts   = int(datetime(end_dt.year,   end_dt.month,   end_dt.day,  23, 59, tzinfo=timezone.utc).timestamp())
+                            asp["daily_budget"] = str(budget_cents)
 
-                            with st.spinner("Launching boost…"):
-                                try:
-                                    cr = requests.post(
-                                        f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/campaigns",
-                                        data={
-                                            "name": campaign_name,
-                                            "objective": objective,
-                                            "status": "ACTIVE",
-                                            "special_ad_categories": "[]",
-                                            "access_token": ACCESS_TOKEN,
-                                        },
-                                        timeout=30,
-                                    ).json()
-                                    if "error" in cr:
-                                        st.error(f"Campaign error: {cr['error']['message']}")
-                                        st.stop()
-                                    campaign_id = cr["id"]
+                        ar = requests.post(
+                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/adsets",
+                            data=asp, timeout=30,
+                        ).json()
+                        if "error" in ar:
+                            st.error(f"Ad set error: {ar['error']['message']}")
+                            st.stop()
+                        adset_id = ar["id"]
 
-                                    asp = {
-                                        "name": f"{campaign_name} — Ad Set",
-                                        "campaign_id": campaign_id,
-                                        "billing_event": "IMPRESSIONS",
-                                        "optimization_goal": opt_goal,
-                                        "targeting": json.dumps({
-                                            "age_min": int(age_min),
-                                            "age_max": int(age_max),
-                                            "geo_locations": {"countries": [country]},
-                                        }),
-                                        "instagram_actor_id": ig_uid,
-                                        "start_time": str(start_ts),
-                                        "end_time": str(end_ts),
-                                        "access_token": ACCESS_TOKEN,
-                                    }
-                                    if budget_type == "Lifetime":
-                                        asp["lifetime_budget"] = str(budget_cents)
-                                    else:
-                                        asp["daily_budget"] = str(budget_cents)
+                        ccr_data = {
+                            "name": f"{campaign_name} — Creative",
+                            "source_instagram_media_id": sel_id,
+                            "call_to_action": json.dumps({"type": cta_btn}),
+                            "access_token": ACCESS_TOKEN,
+                        }
+                        if ig_uid:
+                            ccr_data["instagram_actor_id"] = ig_uid
+                        ccr = requests.post(
+                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/adcreatives",
+                            data=ccr_data, timeout=30,
+                        ).json()
+                        if "error" in ccr:
+                            st.error(f"Creative error: {ccr['error']['message']}")
+                            st.stop()
+                        creative_id = ccr["id"]
 
-                                    ar = requests.post(
-                                        f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/adsets",
-                                        data=asp, timeout=30,
-                                    ).json()
-                                    if "error" in ar:
-                                        st.error(f"Ad set error: {ar['error']['message']}")
-                                        st.stop()
-                                    adset_id = ar["id"]
+                        adr = requests.post(
+                            f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/ads",
+                            data={"name": f"{campaign_name} — Ad", "adset_id": adset_id,
+                                  "creative": json.dumps({"creative_id": creative_id}),
+                                  "status": "ACTIVE", "access_token": ACCESS_TOKEN},
+                            timeout=30,
+                        ).json()
+                        if "error" in adr:
+                            st.error(f"Ad error: {adr['error']['message']}")
+                            st.stop()
 
-                                    ccr = requests.post(
-                                        f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/adcreatives",
-                                        data={
-                                            "name": f"{campaign_name} — Creative",
-                                            "instagram_actor_id": ig_uid,
-                                            "source_instagram_media_id": sel_id,
-                                            "call_to_action": json.dumps({"type": cta_btn}),
-                                            "access_token": ACCESS_TOKEN,
-                                        },
-                                        timeout=30,
-                                    ).json()
-                                    if "error" in ccr:
-                                        st.error(f"Creative error: {ccr['error']['message']}")
-                                        st.stop()
-                                    creative_id = ccr["id"]
+                        st.success(f"Boost launched! Campaign ID: {campaign_id}")
+                        st.balloons()
+                        st.session_state["boost_media_id"] = None
+                        st.cache_data.clear()
 
-                                    adr = requests.post(
-                                        f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/ads",
-                                        data={
-                                            "name": f"{campaign_name} — Ad",
-                                            "adset_id": adset_id,
-                                            "creative": json.dumps({"creative_id": creative_id}),
-                                            "status": "ACTIVE",
-                                            "access_token": ACCESS_TOKEN,
-                                        },
-                                        timeout=30,
-                                    ).json()
-                                    if "error" in adr:
-                                        st.error(f"Ad error: {adr['error']['message']}")
-                                        st.stop()
+                    except Exception as ex:
+                        st.error(f"Something went wrong: {str(ex)}")
 
-                                    st.success(f"Boost launched! Campaign ID: {campaign_id}")
-                                    st.balloons()
-                                    st.session_state["boost_media_id"] = None
-                                    st.cache_data.clear()
-
-                                except Exception as ex:
-                                    st.error(f"Something went wrong: {str(ex)}")
+    with col_preview:
+        st.markdown(f'<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin-bottom:0.75rem;">Ad Preview</div>', unsafe_allow_html=True)
+        caption_preview = prev_caption[:120] + ("…" if len(prev_caption) > 120 else "")
+        st.markdown(f"""
+<div style="background:#fff;border-radius:12px;overflow:hidden;border:1px solid #dbdbdb;max-width:340px;">
+  <div style="display:flex;align-items:center;padding:10px 12px;gap:10px;">
+    <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);display:flex;align-items:center;justify-content:center;">
+      <span style="color:#fff;font-size:0.6rem;font-weight:700;">S</span>
+    </div>
+    <div>
+      <div style="font-size:0.8rem;font-weight:600;color:#000;line-height:1.2;">shpapi.vision</div>
+      <div style="font-size:0.68rem;color:#737373;">Sponsored</div>
+    </div>
+  </div>
+  {"<img src='" + prev_thumb + "' style='width:100%;display:block;' />" if prev_thumb else '<div style="width:100%;aspect-ratio:1;background:#f0f0f0;"></div>'}
+  <div style="padding:10px 12px;">
+    <div style="font-size:0.78rem;color:#000;line-height:1.4;">{caption_preview}</div>
+    <div style="margin-top:8px;padding:8px 0;border-top:1px solid #efefef;font-size:0.75rem;font-weight:600;color:#262626;text-align:center;">Learn More &rsaquo;</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)

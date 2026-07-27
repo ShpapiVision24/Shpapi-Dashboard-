@@ -379,13 +379,16 @@ def fetch_ig_account():
             params={"fields": "id,name,instagram_business_account", "access_token": ACCESS_TOKEN},
             timeout=15,
         )
-        for page in r.json().get("data", []):
+        data = r.json()
+        if "error" in data:
+            return None, None, data["error"].get("message", "Unknown error")
+        for page in data.get("data", []):
             ig = page.get("instagram_business_account", {})
             if ig.get("id"):
-                return ig["id"], page["id"]
-    except Exception:
-        pass
-    return None, None
+                return ig["id"], page["id"], None
+        return None, None, "No Instagram business account linked to any Facebook Page."
+    except Exception as e:
+        return None, None, str(e)
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ig_recent_media(ig_uid):
@@ -399,17 +402,25 @@ def fetch_ig_recent_media(ig_uid):
             },
             timeout=15,
         )
-        return r.json().get("data", [])
-    except Exception:
-        return []
+        data = r.json()
+        if "error" in data:
+            return [], data["error"].get("message", "Unknown error")
+        return data.get("data", []), None
+    except Exception as e:
+        return [], str(e)
 
 with st.spinner("Loading your Instagram posts…"):
-    ig_uid, page_id = fetch_ig_account()
+    ig_uid, page_id, acct_error = fetch_ig_account()
 
-if not ig_uid:
-    st.warning("Could not find a linked Instagram business account. Make sure your Facebook Page is connected to your Instagram account in Meta Business Suite.")
+if acct_error:
+    st.error(f"Could not load Instagram account: {acct_error}")
+elif not ig_uid:
+    st.warning("No Instagram business account found. Make sure your Facebook Page is connected to your Instagram account in Meta Business Suite.")
 else:
-    media_list = fetch_ig_recent_media(ig_uid)
+    media_list, media_error = fetch_ig_recent_media(ig_uid)
+    if media_error:
+        st.error(f"Could not load Instagram posts: {media_error}")
+        media_list = []
     if not media_list:
         st.info("No recent Instagram posts found.")
     else:

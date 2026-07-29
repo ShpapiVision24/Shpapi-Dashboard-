@@ -101,7 +101,7 @@ else:
 end_date = today - timedelta(days=1)
 
 # ── Google Ads data fetch ─────────────────────────────────────────────────────
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_ads_data(start_str, end_str):
     try:
         from google.ads.googleads.client import GoogleAdsClient

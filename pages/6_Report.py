@@ -375,7 +375,7 @@ COMBINED:
                 client = _ant.Anthropic(api_key=api_key)
                 msg = client.messages.create(
                     model="claude-opus-5",
-                    max_tokens=3500,
+                    max_tokens=8000,
                     messages=[{
                         "role": "user",
                         "content": f"""You are a seasoned brand strategist and growth advisor for Shpapi — a sunglasses and clothing brand. You know this brand deeply: it sells lifestyle products, competes on aesthetics and identity, and relies on paid social (Meta/Instagram) and Google Ads to drive Shopify revenue.

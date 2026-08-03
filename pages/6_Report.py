@@ -463,8 +463,7 @@ if ss_key in st.session_state:
             pdf.set_text_color(150, 165, 190)
             pdf.set_xy(0, 22)
             pdf.cell(210, 6,
-                     f"Business Analytics Report  —  {q_short}  —  "
-                     f"{q_start.strftime('%b %d, %Y')} to {q_end.strftime('%b %d, %Y')}",
+                     f"Business Analytics Report  —  {q_short}  —  {period_label}",
                      align="C")
             pdf.set_y(48)
 

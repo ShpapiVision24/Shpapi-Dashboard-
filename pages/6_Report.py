@@ -374,7 +374,7 @@ COMBINED:
                 import anthropic as _ant
                 client = _ant.Anthropic(api_key=api_key)
                 msg = client.messages.create(
-                    model="claude-sonnet-5",
+                    model="claude-opus-5",
                     max_tokens=3500,
                     messages=[{
                         "role": "user",
@@ -411,7 +411,10 @@ This is the most important section. Give 5-6 creative, specific ideas tailored t
 Tone: Direct. Confident. Like a smart friend who happens to be a great strategist. No filler. No corporate speak. Use the actual numbers throughout to back every claim."""
                     }],
                 )
-                st.session_state[ss_key] = msg.content[0].text
+                text_block = next((b for b in msg.content if hasattr(b, "text")), None)
+                if text_block is None:
+                    raise ValueError("No text in AI response")
+                st.session_state[ss_key] = text_block.text
             except Exception as e:
                 st.error(f"AI generation failed: {e}")
 

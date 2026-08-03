@@ -93,32 +93,47 @@ st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 2rem;"><
 st.markdown(f"""
 <div style="margin-bottom:2rem;">
   <div style="font-size:1.4rem;font-weight:700;color:{T1};letter-spacing:-0.5px;">Business Report</div>
-  <div style="font-size:0.7rem;font-weight:500;text-transform:uppercase;letter-spacing:2px;color:{T3};margin-top:0.3rem;">Shpapi &nbsp;·&nbsp; Quarterly Analytics &amp; AI Summary</div>
+  <div style="font-size:0.7rem;font-weight:500;text-transform:uppercase;letter-spacing:2px;color:{T3};margin-top:0.3rem;">Shpapi &nbsp;·&nbsp; Analytics &amp; AI Business Analysis</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Quarter / year selector ───────────────────────────────────────────────────
-today   = date.today()
-cur_q   = (today.month - 1) // 3 + 1
+# ── Period selector ───────────────────────────────────────────────────────────
+today    = date.today()
+cur_q    = (today.month - 1) // 3 + 1
 q_labels = ["Q1  (Jan – Mar)", "Q2  (Apr – Jun)", "Q3  (Jul – Sep)", "Q4  (Oct – Dec)"]
 
-sc1, sc2, sc3 = st.columns([1, 1.4, 4])
+sc1, sc2, sc3, _ = st.columns([1.1, 1, 1.4, 2.5])
 with sc1:
-    sel_year = st.selectbox("Year", [2026, 2025, 2024], index=0, label_visibility="collapsed")
+    period_type = st.selectbox("Period", ["All Time", "By Quarter"], index=0, label_visibility="collapsed")
 with sc2:
-    sel_q_label = st.selectbox("Quarter", q_labels, index=cur_q - 1, label_visibility="collapsed")
+    sel_year = st.selectbox("Year", [2026, 2025, 2024], index=0,
+                            label_visibility="collapsed",
+                            disabled=(period_type == "All Time"))
+with sc3:
+    sel_q_label = st.selectbox("Quarter", q_labels, index=cur_q - 1,
+                               label_visibility="collapsed",
+                               disabled=(period_type == "All Time"))
 
-q_idx = q_labels.index(sel_q_label)
-q_num = q_idx + 1
-_QR = {1: (1,1,3,31), 2: (4,1,6,30), 3: (7,1,9,30), 4: (10,1,12,31)}
-sm, sd, em, ed = _QR[q_num]
-q_start   = date(sel_year, sm, sd)
-q_end     = min(date(sel_year, em, ed), today)
-start_str = q_start.strftime("%Y-%m-%d")
-end_str   = q_end.strftime("%Y-%m-%d")
-q_short   = f"Q{q_num} {sel_year}"
+all_time = (period_type == "All Time")
 
-st.markdown(f'<div style="font-size:0.75rem;color:{T3};margin:-0.5rem 0 1.5rem;">{q_start.strftime("%B %d, %Y")} → {q_end.strftime("%B %d, %Y")}</div>', unsafe_allow_html=True)
+if all_time:
+    start_str = "2020-01-01"
+    end_str   = today.strftime("%Y-%m-%d")
+    q_short   = "All Time"
+    period_label = f"All available data through {today.strftime('%B %d, %Y')}"
+else:
+    q_idx  = q_labels.index(sel_q_label)
+    q_num  = q_idx + 1
+    _QR    = {1: (1,1,3,31), 2: (4,1,6,30), 3: (7,1,9,30), 4: (10,1,12,31)}
+    sm, sd, em, ed = _QR[q_num]
+    q_start  = date(sel_year, sm, sd)
+    q_end    = min(date(sel_year, em, ed), today)
+    start_str = q_start.strftime("%Y-%m-%d")
+    end_str   = q_end.strftime("%Y-%m-%d")
+    q_short   = f"Q{q_num} {sel_year}"
+    period_label = f"{q_start.strftime('%B %d, %Y')} → {q_end.strftime('%B %d, %Y')}"
+
+st.markdown(f'<div style="font-size:0.75rem;color:{T3};margin:-0.5rem 0 1.5rem;">{period_label}</div>', unsafe_allow_html=True)
 
 # ── Secrets ───────────────────────────────────────────────────────────────────
 ACCESS_TOKEN    = st.secrets.get("META_ACCESS_TOKEN", "")
@@ -127,8 +142,7 @@ SHOP_URL        = st.secrets.get("SHOP_URL", "")
 SH_HEADERS      = {"X-Shopify-Access-Token": SHOPIFY_TOKEN, "Content-Type": "application/json"}
 
 # ── Fetch functions ───────────────────────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_meta_q(start_str, end_str):
+def _meta_fetch(params_extra):
     if not ACCESS_TOKEN:
         return [], None
     try:
@@ -136,9 +150,9 @@ def fetch_meta_q(start_str, end_str):
         params = {
             "fields": "campaign_name,spend,reach,impressions,clicks,actions,action_values",
             "level": "campaign",
-            "time_range": json.dumps({"since": start_str, "until": end_str}),
             "limit": 100,
             "access_token": ACCESS_TOKEN,
+            **params_extra,
         }
         while url:
             r    = requests.get(url, params=params, timeout=15)
@@ -151,6 +165,14 @@ def fetch_meta_q(start_str, end_str):
         return rows, None
     except Exception as e:
         return [], str(e)
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_meta_alltime():
+    return _meta_fetch({"date_preset": "maximum"})
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_meta_q(start_str, end_str):
+    return _meta_fetch({"time_range": json.dumps({"since": start_str, "until": end_str})})
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_q(start_str, end_str):
@@ -218,7 +240,10 @@ def fetch_shopify_q(start_str, end_str):
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 with st.spinner("Loading data for all platforms…"):
-    meta_rows,   meta_err   = fetch_meta_q(start_str, end_str)
+    if all_time:
+        meta_rows, meta_err = fetch_meta_alltime()
+    else:
+        meta_rows, meta_err = fetch_meta_q(start_str, end_str)
     google_df,   google_err = fetch_google_q(start_str, end_str)
     shopify_raw, sh_err     = fetch_shopify_q(start_str, end_str)
 
@@ -252,7 +277,7 @@ roas           = sh_revenue / total_ad_spend if total_ad_spend else 0.0
 meta_roas      = meta_conv_val / meta_spend if meta_spend else 0.0
 
 # ── KPI grid ──────────────────────────────────────────────────────────────────
-st.markdown(f'<div class="section">{q_short} · Cross-Platform Summary</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="section">{q_short} &nbsp;·&nbsp; Cross-Platform Summary</div>', unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class="kpi-grid">

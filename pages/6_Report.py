@@ -342,7 +342,7 @@ if st.button("Generate Full Business Analysis", type="primary"):
         st.error("Add ANTHROPIC_API_KEY to your Streamlit secrets to enable AI summaries.")
     else:
         ctx = f"""Business: Shpapi — sunglasses and clothing brand.
-Quarter: {q_short}  ({q_start.strftime('%b %d')} – {q_end.strftime('%b %d, %Y')})
+Period: {q_short}  ({period_label})
 
 SHOPIFY:
   Revenue: ${sh_revenue:,.2f}

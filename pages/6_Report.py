@@ -421,24 +421,67 @@ Tone: Direct. Confident. Like a smart friend who happens to be a great strategis
 if ss_key in st.session_state:
     ai_text = st.session_state[ss_key]
 
+    import re as _re
+
+    def _md_to_html(text):
+        lines   = text.split("\n")
+        out     = []
+        in_list = False
+        for line in lines:
+            s = line.strip()
+            if not s:
+                if in_list:
+                    out.append("</ul>")
+                    in_list = False
+                continue
+            # inline bold
+            s = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', s)
+            # inline italic (single *)
+            s = _re.sub(r'\*(?!\*)(.+?)\*(?!\*)', r'<em>\1</em>', s)
+            if s.startswith("## "):
+                if in_list:
+                    out.append("</ul>")
+                    in_list = False
+                out.append(f'<h2>{s[3:]}</h2>')
+            elif s.startswith(("- ", "* ", "• ")):
+                if not in_list:
+                    out.append("<ul>")
+                    in_list = True
+                out.append(f"<li>{s[2:]}</li>")
+            else:
+                if in_list:
+                    out.append("</ul>")
+                    in_list = False
+                out.append(f"<p>{s}</p>")
+        if in_list:
+            out.append("</ul>")
+        return "\n".join(out)
+
+    ai_html = _md_to_html(ai_text)
+
     st.markdown(f"""
     <style>
     .report-body h2 {{
-        font-size: 0.78rem !important; font-weight: 700 !important;
-        text-transform: uppercase !important; letter-spacing: 2px !important;
-        color: {BLUE} !important; margin: 1.8rem 0 0.6rem !important;
-        border-bottom: 1px solid rgba(59,130,246,0.2); padding-bottom: 0.4rem;
+        font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 2px; color: {BLUE}; margin: 2rem 0 0.7rem;
+        border-bottom: 1px solid rgba(59,130,246,0.2); padding-bottom: 0.5rem;
     }}
-    .report-body p {{ font-size: 0.88rem !important; color: rgba(255,255,255,0.82) !important; line-height: 1.75 !important; margin: 0 0 0.6rem !important; }}
-    .report-body ul {{ margin: 0.4rem 0 0.8rem 1.2rem !important; padding: 0 !important; }}
-    .report-body li {{ font-size: 0.86rem !important; color: rgba(255,255,255,0.78) !important; line-height: 1.7 !important; margin-bottom: 0.5rem !important; }}
-    .report-body strong {{ color: #ffffff !important; font-weight: 700 !important; }}
+    .report-body p {{
+        font-size: 0.88rem; color: rgba(255,255,255,0.82);
+        line-height: 1.78; margin: 0 0 0.75rem;
+    }}
+    .report-body ul {{ margin: 0.3rem 0 1rem 1.1rem; padding: 0; }}
+    .report-body li {{
+        font-size: 0.86rem; color: rgba(255,255,255,0.78);
+        line-height: 1.72; margin-bottom: 0.6rem;
+    }}
+    .report-body strong {{ color: #ffffff; font-weight: 700; }}
+    .report-body em {{ color: rgba(255,255,255,0.7); font-style: italic; }}
     </style>
     <div class="report-body" style="background:{SURFACE};border:1px solid {BORDER};border-radius:14px;padding:2rem 2.5rem;">
+    {ai_html}
+    </div>
     """, unsafe_allow_html=True)
-
-    st.markdown(ai_text)
-    st.markdown("</div>", unsafe_allow_html=True)
 
     # ── PDF Export ─────────────────────────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)

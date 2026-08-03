@@ -7,3 +7,4 @@ numpy
 anthropic
 matplotlib
 google-ads
+fpdf2

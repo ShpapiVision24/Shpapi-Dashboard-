@@ -2,9 +2,15 @@ import streamlit as st
 import requests
 import base64
 import os
-from datetime import timedelta
+from datetime import timedelta, date
 from PIL import Image
 import numpy as np
+
+try:
+    from fpdf import FPDF
+    FPDF_OK = True
+except ImportError:
+    FPDF_OK = False
 
 ASSETS    = os.path.join(os.path.dirname(__file__), "assets")
 LOGO_SRC  = os.path.join(ASSETS, "logo.png")
@@ -184,7 +190,7 @@ div[data-testid="stForm"] {{ border: none !important; }}
 """, unsafe_allow_html=True)
 
 # Nav bar
-_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 1.2, 1.8])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _c_rp, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 1.0, 1.0, 0.6])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -200,6 +206,8 @@ with _c_qb:
     st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
 with _c_ig:
     st.page_link("pages/5_Instagram.py", label="Instagram")
+with _c_rp:
+    st.page_link("pages/6_Report.py", label="Reports")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 2rem;"></div>', unsafe_allow_html=True)
 
 st.markdown(f"""
@@ -512,3 +520,114 @@ with col4:
         </div>
         """, unsafe_allow_html=True)
         st.page_link("pages/5_Instagram.py", label="View Instagram →")
+
+# ── PDF Export ────────────────────────────────────────────────────────────────
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+st.markdown('<div class="section">Export</div>', unsafe_allow_html=True)
+
+if not FPDF_OK:
+    st.info("PDF export will be available after the next deploy (fpdf2 is installing).")
+else:
+    def _build_dashboard_pdf():
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_margins(16, 16, 16)
+        pdf.set_auto_page_break(auto=True, margin=20)
+
+        # Header
+        pdf.set_fill_color(10, 22, 40)
+        pdf.rect(0, 0, 210, 38, "F")
+        pdf.set_font("Helvetica", "B", 22)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_xy(0, 7)
+        pdf.cell(210, 10, "SHPAPI", align="C")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(150, 165, 190)
+        pdf.set_xy(0, 20)
+        pdf.cell(210, 6, f"Analytics Dashboard Export  —  {date.today().strftime('%B %d, %Y')}", align="C")
+        pdf.set_y(46)
+
+        def _section(title):
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(80, 100, 140)
+            pdf.cell(0, 5, title, ln=True)
+            pdf.set_draw_color(59, 130, 246)
+            pdf.line(16, pdf.get_y(), 194, pdf.get_y())
+            pdf.ln(4)
+
+        def _card(x, y, w, h, title, rows, accent_rgb):
+            pdf.set_fill_color(14, 31, 60)
+            pdf.set_draw_color(25, 45, 75)
+            pdf.rect(x, y, w, h, "FD")
+            pdf.set_fill_color(*accent_rgb)
+            pdf.rect(x, y, w, 2, "F")
+            pdf.set_font("Helvetica", "B", 7)
+            pdf.set_text_color(120, 140, 175)
+            pdf.set_xy(x + 4, y + 5)
+            pdf.cell(w - 8, 4, title.upper())
+            oy = y + 12
+            for label, value in rows:
+                pdf.set_font("Helvetica", "", 6)
+                pdf.set_text_color(110, 130, 165)
+                pdf.set_xy(x + 4, oy)
+                pdf.cell(w - 8, 3.5, label.upper())
+                oy += 4
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.set_text_color(240, 245, 255)
+                pdf.set_xy(x + 4, oy)
+                pdf.cell(w - 8, 6, value)
+                oy += 8
+
+        _section("PLATFORM OVERVIEW")
+
+        cw, gap = 85, 8
+        x1, x2  = 16, 16 + cw + gap
+        ch       = 72
+        y0       = pdf.get_y()
+
+        # Meta Ads
+        _card(x1, y0, cw, ch, "Meta Ads", [
+            ("Total Spend (All Time)", f"${meta['spend']:,.2f}" if meta else "—"),
+            ("Link Clicks",            f"{meta['clicks']:,}"   if meta else "—"),
+            ("Impressions",            f"{meta['impressions']:,}" if meta else "—"),
+        ], (59, 130, 246))
+
+        # Shopify
+        _card(x2, y0, cw, ch, "Shopify", [
+            ("Revenue (Last 30 Days)", f"${shopify['revenue_30d']:,.2f}" if shopify else "—"),
+            ("Orders (Last 30 Days)",  f"{shopify['orders_30d']:,}"       if shopify else "—"),
+            ("Total Orders (All Time)",f"{shopify['total_orders']:,}"     if shopify else "—"),
+        ], (34, 197, 94))
+
+        y1 = y0 + ch + gap
+
+        # Google Ads
+        _card(x1, y1, cw, ch, "Google Ads", [
+            ("Total Spend (All Time)", f"${google['spend']:,.2f}"       if google else "—"),
+            ("Clicks",                 f"{google['clicks']:,}"           if google else "—"),
+            ("Impressions",            f"{google['impressions']:,}"      if google else "—"),
+        ], (139, 92, 246))
+
+        # Instagram
+        _card(x2, y1, cw, ch, "Instagram Boosts", [
+            ("Total Spend (All Time)", f"${instagram['spend']:,.2f}"     if instagram else "—"),
+            ("Reach",                  f"{instagram['reach']:,}"          if instagram else "—"),
+            ("Impressions",            f"{instagram['impressions']:,}"    if instagram else "—"),
+        ], (236, 72, 153))
+
+        pdf.set_y(y1 + ch + 10)
+
+        # Footer
+        pdf.set_y(-16)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.set_text_color(110, 130, 165)
+        pdf.cell(0, 5, f"Generated by Shpapi Vision  ·  shpapivision.streamlit.app  ·  {date.today().strftime('%B %d, %Y')}", align="C")
+
+        return bytes(pdf.output())
+
+    st.download_button(
+        label="Download Dashboard PDF",
+        data=_build_dashboard_pdf(),
+        file_name=f"shpapi_dashboard_{date.today().strftime('%Y-%m-%d')}.pdf",
+        mime="application/pdf",
+    )

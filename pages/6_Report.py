@@ -447,6 +447,26 @@ if ss_key in st.session_state:
         st.info("PDF export requires `fpdf2`. It will be available after the next deploy.")
     else:
         def _build_pdf():
+            import re as _re
+
+            # Strip any character Helvetica/Latin-1 can't encode
+            def _safe(text):
+                return (str(text)
+                    .replace('—', '--').replace('–', '-')
+                    .replace('→', '->').replace('←', '<-')
+                    .replace('•', '-').replace('‣', '-')
+                    .replace('‘', "'").replace('’', "'")
+                    .replace('“', '"').replace('”', '"')
+                    .replace('…', '...').replace('·', '.')
+                    .replace(' ', ' ').replace('×', 'x')
+                    .replace('≈', '~').replace('≥', '>=')
+                    .replace('≤', '<=').replace('®', '(R)')
+                    .replace('™', '(TM)').replace('©', '(C)')
+                    .encode('latin-1', errors='replace').decode('latin-1')
+                )
+
+            period_safe = _safe(f"{q_short}  |  {period_label}")
+
             pdf = FPDF()
             pdf.add_page()
             pdf.set_margins(18, 18, 18)
@@ -462,16 +482,14 @@ if ss_key in st.session_state:
             pdf.set_font("Helvetica", "", 8)
             pdf.set_text_color(150, 165, 190)
             pdf.set_xy(0, 22)
-            pdf.cell(210, 6,
-                     f"Business Analytics Report  —  {q_short}  —  {period_label}",
-                     align="C")
+            pdf.cell(210, 6, _safe(f"Business Analytics Report  |  {period_safe}"), align="C")
             pdf.set_y(48)
 
             # ── KPI boxes ─────────────────────────────────────────────────────
             def _section(title):
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.set_text_color(80, 100, 140)
-                pdf.cell(0, 6, title, ln=True)
+                pdf.cell(0, 6, _safe(title), ln=True)
                 pdf.set_draw_color(59, 130, 246)
                 pdf.line(18, pdf.get_y(), 192, pdf.get_y())
                 pdf.ln(4)
@@ -485,16 +503,16 @@ if ss_key in st.session_state:
                 pdf.set_font("Helvetica", "", 6)
                 pdf.set_text_color(120, 140, 170)
                 pdf.set_xy(x + 3, y + 4)
-                pdf.cell(w - 6, 4, label.upper())
+                pdf.cell(w - 6, 4, _safe(label.upper()))
                 pdf.set_font("Helvetica", "B", 13)
                 pdf.set_text_color(255, 255, 255)
                 pdf.set_xy(x + 3, y + 9)
-                pdf.cell(w - 6, 7, value)
+                pdf.cell(w - 6, 7, _safe(value))
                 if sub:
                     pdf.set_font("Helvetica", "", 6)
                     pdf.set_text_color(120, 140, 170)
                     pdf.set_xy(x + 3, y + 18)
-                    pdf.cell(w - 6, 4, sub)
+                    pdf.cell(w - 6, 4, _safe(sub))
 
             _section("CROSS-PLATFORM SUMMARY")
 
@@ -503,20 +521,23 @@ if ss_key in st.session_state:
             rh, rg  = 28, 5
             y0 = pdf.get_y()
 
-            _kpi_box(x1, y0,           cw, rh, "Shopify Revenue",  f"${sh_revenue:,.2f}",       f"{sh_orders} orders · AOV ${sh_aov:.2f}", (34, 197, 94))
-            _kpi_box(x2, y0,           cw, rh, "Total Ad Spend",   f"${total_ad_spend:,.2f}",   f"Meta ${meta_spend:.2f} · Google ${g_spend:.2f}", (245, 158, 11))
-            _kpi_box(x1, y0+rh+rg,     cw, rh, "Blended ROAS",     f"{roas:.2f}x",              "Revenue per $1 of ad spend", (59, 130, 246))
-            _kpi_box(x2, y0+rh+rg,     cw, rh, "Combined Reach",   f"{(meta_reach+g_impressions):,}", "Meta reach + Google impressions", (168, 85, 247))
+            _kpi_box(x1, y0,       cw, rh, "Shopify Revenue", f"${sh_revenue:,.2f}",
+                     f"{sh_orders} orders | AOV ${sh_aov:.2f}", (34, 197, 94))
+            _kpi_box(x2, y0,       cw, rh, "Total Ad Spend",  f"${total_ad_spend:,.2f}",
+                     f"Meta ${meta_spend:.2f} | Google ${g_spend:.2f}", (245, 158, 11))
+            _kpi_box(x1, y0+rh+rg, cw, rh, "Blended ROAS",   f"{roas:.2f}x",
+                     "Revenue per $1 of ad spend", (59, 130, 246))
+            _kpi_box(x2, y0+rh+rg, cw, rh, "Combined Reach",  f"{(meta_reach+g_impressions):,}",
+                     "Meta reach + Google impressions", (168, 85, 247))
 
             pdf.set_y(y0 + 2*(rh+rg) + 8)
 
-            # Second row of detail boxes
             tw = 172 / 4 - 3
             detail = [
-                ("Meta Impressions",  f"{meta_impressions:,}",   f"Reach {meta_reach:,}",        (236, 72, 153)),
-                ("Meta Clicks",       f"{meta_clicks:,}",         f"Purchases {meta_purchases}",  (236, 72, 153)),
-                ("Google Clicks",     f"{g_clicks:,}",            f"Impr. {g_impressions:,}",     (59, 130, 246)),
-                ("Google Conv.",      f"{g_conversions:.1f}",     f"CPC ${(g_spend/g_clicks if g_clicks else 0):.2f}", (59, 130, 246)),
+                ("Meta Impressions", f"{meta_impressions:,}",  f"Reach {meta_reach:,}",       (236, 72, 153)),
+                ("Meta Clicks",      f"{meta_clicks:,}",        f"Purchases {meta_purchases}", (236, 72, 153)),
+                ("Google Clicks",    f"{g_clicks:,}",           f"Impr. {g_impressions:,}",    (59, 130, 246)),
+                ("Google Conv.",     f"{g_conversions:.1f}",    f"CPC ${(g_spend/g_clicks if g_clicks else 0):.2f}", (59, 130, 246)),
             ]
             dx = 18
             for label, val, sub, rgb in detail:
@@ -528,7 +549,6 @@ if ss_key in st.session_state:
             pdf.ln(3)
             _section("STRATEGIC BUSINESS ANALYSIS")
 
-            import re as _re
             for line in ai_text.split("\n"):
                 stripped = line.strip()
                 if not stripped:
@@ -542,19 +562,19 @@ if ss_key in st.session_state:
                     pdf.set_font("Helvetica", "B", 8)
                     pdf.set_text_color(59, 130, 246)
                     pdf.set_x(21)
-                    pdf.cell(168, 8, stripped[3:].upper())
+                    pdf.cell(168, 8, _safe(stripped[3:].upper()))
                     pdf.ln(10)
                 elif stripped.startswith(("- ", "* ", "• ")):
-                    content = _re.sub(r'\*\*(.+?)\*\*', r'\1', stripped[2:])
+                    content = _safe(_re.sub(r'\*\*(.+?)\*\*', r'\1', stripped[2:]))
                     pdf.set_font("Helvetica", "", 8.5)
                     pdf.set_text_color(35, 52, 75)
                     pdf.set_x(22)
-                    pdf.cell(4, 5, chr(149))
+                    pdf.cell(4, 5, "-")
                     pdf.set_x(27)
                     pdf.multi_cell(163, 5, content)
                     pdf.ln(0.5)
                 else:
-                    content = _re.sub(r'\*\*(.+?)\*\*', r'\1', stripped)
+                    content = _safe(_re.sub(r'\*\*(.+?)\*\*', r'\1', stripped))
                     pdf.set_font("Helvetica", "", 8.5)
                     pdf.set_text_color(35, 52, 75)
                     pdf.multi_cell(174, 5, content)
@@ -565,7 +585,7 @@ if ss_key in st.session_state:
             pdf.set_font("Helvetica", "", 7)
             pdf.set_text_color(130, 145, 165)
             pdf.cell(0, 5,
-                     f"Generated by Shpapi Vision Dashboard  ·  {date.today().strftime('%B %d, %Y')}",
+                     _safe(f"Generated by Shpapi Vision Dashboard  |  {date.today().strftime('%B %d, %Y')}"),
                      align="C")
 
             return bytes(pdf.output())

@@ -402,22 +402,36 @@ if st.session_state.ai_messages:
             with st.spinner("Analyzing your data..."):
                 try:
                     import anthropic as ac
-                    client    = ac.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-                    meta_ctx  = f"Spend ${meta['spend']:,.2f} | Clicks {meta['clicks']:,} | Impressions {meta['impressions']:,}" if meta else "unavailable"
-                    shop_ctx  = f"Revenue ${shopify['revenue_30d']:,.2f} (30d) | Orders {shopify['orders_30d']} (30d) | Total Orders All-Time {shopify['total_orders']}" if shopify else "unavailable"
-                    qb_ctx    = f"Net Income YTD ${qb['net_income']:,.2f}" if qb and qb.get("net_income") is not None else "unavailable"
-                    system_p  = f"""You are a growth analyst for Shpapi, a clothing and sunglasses brand. Speak directly and conversationally — like a smart advisor talking to the founder, not a consultant writing a report. No bullet points. No headers. Just clear, plain sentences that get straight to the point. Keep responses under 150 words.
-Current live data:
+                    client   = ac.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+                    meta_ctx = (f"Spend ${meta['spend']:,.2f} (all-time) | Clicks {meta['clicks']:,} | "
+                                f"Impressions {meta['impressions']:,}") if meta else "unavailable"
+                    shop_ctx = (f"Revenue ${shopify['revenue_30d']:,.2f} (last 30d) | "
+                                f"Orders {shopify['orders_30d']} (30d) | "
+                                f"Total orders all-time {shopify['total_orders']}") if shopify else "unavailable"
+                    qb_ctx   = (f"Net Income YTD ${qb['net_income']:,.2f}"
+                                if qb and qb.get("net_income") is not None else "unavailable")
+                    ig_ctx   = (f"Spend ${instagram['spend']:,.2f} | Reach {instagram['reach']:,} | "
+                                f"Impressions {instagram['impressions']:,}") if instagram else "unavailable"
+                    g_ctx    = (f"Spend ${google['spend']:,.2f} | Clicks {google['clicks']:,} | "
+                                f"Impressions {google['impressions']:,} | "
+                                f"Conversions {google['conversions']:.1f}") if google else "unavailable"
+                    system_p = f"""You are the AI growth analyst for Shpapi, a sunglasses and clothing brand. \
+Speak directly like a trusted advisor — plain sentences, no corporate jargon. \
+Always reference the actual numbers. Keep responses concise (under 200 words).
+
+LIVE DATA (all-time unless noted):
 - Meta Ads: {meta_ctx}
+- Instagram Boosts: {ig_ctx}
 - Shopify: {shop_ctx}
+- Google Ads: {g_ctx}
 - QuickBooks: {qb_ctx}"""
                     resp = client.messages.create(
-                        model="claude-haiku-4-5-20251001",
-                        max_tokens=512,
+                        model="claude-opus-5",
+                        max_tokens=600,
                         system=system_p,
                         messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.ai_messages]
                     )
-                    answer = resp.content[0].text
+                    answer = next((b.text for b in resp.content if hasattr(b, "text")), "")
                     st.markdown(answer)
                     st.session_state.ai_messages.append({"role": "assistant", "content": answer})
                 except Exception as e:

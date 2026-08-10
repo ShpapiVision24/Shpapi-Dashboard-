@@ -139,7 +139,6 @@ def fetch_google_ads_data(start_str, end_str):
                 metrics.average_cpc,
                 metrics.cost_per_conversion,
                 metrics.value_per_conversion,
-                metrics.conversions_value_per_cost,
                 segments.date
             FROM campaign
             WHERE segments.date BETWEEN '{start_str}' AND '{end_str}'

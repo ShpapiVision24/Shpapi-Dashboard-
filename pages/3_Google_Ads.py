@@ -126,12 +126,18 @@ def fetch_google_ads_data(start_str, end_str):
             SELECT
                 campaign.name,
                 campaign.status,
+                campaign.advertising_channel_type,
+                campaign.bidding_strategy_type,
                 metrics.impressions,
                 metrics.clicks,
                 metrics.cost_micros,
                 metrics.conversions,
+                metrics.conversions_value,
                 metrics.ctr,
                 metrics.average_cpc,
+                metrics.cost_per_conversion,
+                metrics.value_per_conversion,
+                metrics.conversions_value_per_cost,
                 segments.date
             FROM campaign
             WHERE segments.date BETWEEN '{start_str}' AND '{end_str}'
@@ -139,19 +145,48 @@ def fetch_google_ads_data(start_str, end_str):
             ORDER BY metrics.cost_micros DESC
         """
 
+        _CH = {
+            "SEARCH": "Search", "DISPLAY": "Display", "SHOPPING": "Shopping",
+            "VIDEO": "Video", "PERFORMANCE_MAX": "Perf. Max",
+            "MULTI_CHANNEL": "Perf. Max", "SMART": "Smart",
+            "DEMAND_GEN": "Demand Gen", "DISCOVERY": "Discovery",
+        }
+        _BID = {
+            "MAXIMIZE_CONVERSION_VALUE": "Max Conv. Value",
+            "MAXIMIZE_CONVERSIONS": "Max Conversions",
+            "TARGET_CPA": "Target CPA",
+            "TARGET_ROAS": "Target ROAS",
+            "TARGET_IMPRESSION_SHARE": "Target Impr. Share",
+            "MANUAL_CPC": "Manual CPC",
+            "MANUAL_CPM": "Manual CPM",
+            "TARGET_CPM": "Target CPM",
+        }
+
         response = ga_service.search(customer_id=customer_id, query=query)
         rows = []
         for row in response:
+            cost = row.metrics.cost_micros / 1_000_000
+            clicks = row.metrics.clicks
+            convs  = row.metrics.conversions
+            conv_val = row.metrics.conversions_value
+            ch_raw  = row.campaign.advertising_channel_type.name
+            bid_raw = row.campaign.bidding_strategy_type.name
             rows.append({
-                "Campaign": row.campaign.name,
-                "Status": row.campaign.status.name,
-                "Date": row.segments.date,
-                "Impressions": row.metrics.impressions,
-                "Clicks": row.metrics.clicks,
-                "Cost": row.metrics.cost_micros / 1_000_000,
-                "Conversions": row.metrics.conversions,
-                "CTR": row.metrics.ctr * 100,
-                "Avg CPC": row.metrics.average_cpc / 1_000_000,
+                "Campaign":      row.campaign.name,
+                "Type":          _CH.get(ch_raw, ch_raw.replace("_", " ").title()),
+                "Bid Strategy":  _BID.get(bid_raw, bid_raw.replace("_", " ").title()),
+                "Status":        row.campaign.status.name,
+                "Date":          row.segments.date,
+                "Impressions":   row.metrics.impressions,
+                "Clicks":        clicks,
+                "Cost":          cost,
+                "Conversions":   convs,
+                "Conv. Value":   conv_val,
+                "CTR":           row.metrics.ctr * 100,
+                "Avg CPC":       row.metrics.average_cpc / 1_000_000,
+                "Conv. Rate":    (convs / clicks * 100) if clicks else 0,
+                "Cost / Conv.":  (cost / convs) if convs else 0,
+                "ROAS":          (conv_val / cost) if cost else 0,
             })
         return pd.DataFrame(rows), None
     except Exception as e:
@@ -189,8 +224,12 @@ total_spend       = df["Cost"].sum()
 total_clicks      = int(df["Clicks"].sum())
 total_impressions = int(df["Impressions"].sum())
 total_conversions = df["Conversions"].sum()
+total_conv_value  = df["Conv. Value"].sum()
 avg_ctr           = (total_clicks / total_impressions * 100) if total_impressions else 0
 avg_cpc           = (total_spend / total_clicks) if total_clicks else 0
+avg_conv_rate     = (total_conversions / total_clicks * 100) if total_clicks else 0
+cost_per_conv     = (total_spend / total_conversions) if total_conversions else 0
+roas              = (total_conv_value / total_spend) if total_spend else 0
 
 st.markdown(f"""
 <div class="kpi-grid">
@@ -201,20 +240,32 @@ st.markdown(f"""
   <div class="kpi">
     <div class="kpi-label">Clicks</div>
     <div class="kpi-value">{total_clicks:,}</div>
+    <div class="kpi-sub">Impressions: {total_impressions:,}</div>
   </div>
   <div class="kpi">
-    <div class="kpi-label">Impressions</div>
-    <div class="kpi-value">{total_impressions:,}</div>
+    <div class="kpi-label">CTR</div>
+    <div class="kpi-value">{avg_ctr:.2f}%</div>
+    <div class="kpi-sub">Avg CPC: ${avg_cpc:.2f}</div>
   </div>
   <div class="kpi">
     <div class="kpi-label">Conversions</div>
     <div class="kpi-value">{total_conversions:,.1f}</div>
+    <div class="kpi-sub">Conv. Rate: {avg_conv_rate:.2f}%</div>
   </div>
 </div>
 <div class="kpi-grid">
   <div class="kpi">
-    <div class="kpi-label">Avg CTR</div>
-    <div class="kpi-value">{avg_ctr:.2f}%</div>
+    <div class="kpi-label">Conv. Value</div>
+    <div class="kpi-value">${total_conv_value:,.2f}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">ROAS</div>
+    <div class="kpi-value">{roas:.2f}x</div>
+    <div class="kpi-sub">Conv. value per $1 spent</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Cost / Conv.</div>
+    <div class="kpi-value">${cost_per_conv:,.2f}</div>
   </div>
   <div class="kpi">
     <div class="kpi-label">Avg CPC</div>
@@ -245,18 +296,36 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ── Campaign breakdown ────────────────────────────────────────────────────────
 st.markdown('<div class="section">Campaign Breakdown</div>', unsafe_allow_html=True)
-camp = (df.groupby(["Campaign", "Status"])
-          .agg(Impressions=("Impressions","sum"), Clicks=("Clicks","sum"),
-               Cost=("Cost","sum"), Conversions=("Conversions","sum"))
+camp = (df.groupby(["Campaign", "Type", "Bid Strategy", "Status"])
+          .agg(
+              Impressions  = ("Impressions",  "sum"),
+              Clicks       = ("Clicks",       "sum"),
+              Cost         = ("Cost",         "sum"),
+              Conversions  = ("Conversions",  "sum"),
+              Conv_Value   = ("Conv. Value",  "sum"),
+          )
           .reset_index()
           .sort_values("Cost", ascending=False))
-camp["CTR"]     = (camp["Clicks"] / camp["Impressions"] * 100).fillna(0)
-camp["Avg CPC"] = (camp["Cost"] / camp["Clicks"]).fillna(0)
-camp["Cost"]    = camp["Cost"].map("${:,.2f}".format)
-camp["Avg CPC"] = camp["Avg CPC"].map("${:,.2f}".format)
-camp["CTR"]     = camp["CTR"].map("{:.2f}%".format)
+
+camp["CTR"]         = (camp["Clicks"] / camp["Impressions"] * 100).fillna(0)
+camp["Avg CPC"]     = (camp["Cost"] / camp["Clicks"]).fillna(0)
+camp["Conv. Rate"]  = (camp["Conversions"] / camp["Clicks"] * 100).fillna(0)
+camp["Cost/Conv."]  = (camp["Cost"] / camp["Conversions"]).replace([float("inf")], 0).fillna(0)
+camp["ROAS"]        = (camp["Conv_Value"] / camp["Cost"]).replace([float("inf")], 0).fillna(0)
+
+# Format for display
 camp["Impressions"] = camp["Impressions"].map("{:,}".format)
 camp["Clicks"]      = camp["Clicks"].map("{:,}".format)
+camp["Cost"]        = camp["Cost"].map("${:,.2f}".format)
+camp["Conv. Value"] = camp["Conv_Value"].map("${:,.2f}".format)
 camp["Conversions"] = camp["Conversions"].map("{:.1f}".format)
+camp["CTR"]         = camp["CTR"].map("{:.2f}%".format)
+camp["Avg CPC"]     = camp["Avg CPC"].map("${:,.2f}".format)
+camp["Conv. Rate"]  = camp["Conv. Rate"].map("{:.2f}%".format)
+camp["Cost/Conv."]  = camp["Cost/Conv."].map("${:,.2f}".format)
+camp["ROAS"]        = camp["ROAS"].map("{:.2f}x".format)
 
-st.dataframe(camp, use_container_width=True, hide_index=True)
+display_cols = ["Campaign", "Type", "Bid Strategy", "Status",
+                "Impressions", "Clicks", "CTR", "Avg CPC", "Cost",
+                "Conversions", "Conv. Rate", "Conv. Value", "Cost/Conv.", "ROAS"]
+st.dataframe(camp[display_cols], use_container_width=True, hide_index=True)

@@ -19,7 +19,7 @@ PURPLE  = "#a855f7"
 ORANGE  = "#f59e0b"
 PINK    = "#ec4899"
 
-META_ACCOUNT = "act_8429913163714900"
+IG_ACCOUNT = "act_8429913163714900"
 
 st.set_page_config(page_title="Shpapi · AI Assistant", layout="wide", initial_sidebar_state="collapsed")
 
@@ -114,6 +114,7 @@ st.markdown(f"""
 
 # ── Secrets ───────────────────────────────────────────────────────────────────
 ACCESS_TOKEN  = st.secrets.get("META_ACCESS_TOKEN", "")
+AD_ACCOUNT_ID = st.secrets.get("AD_ACCOUNT_ID", "")
 SHOPIFY_TOKEN = st.secrets.get("SHOPIFY_TOKEN", "")
 SHOP_URL      = st.secrets.get("SHOP_URL", "")
 SH_HEADERS    = {"X-Shopify-Access-Token": SHOPIFY_TOKEN, "Content-Type": "application/json"}
@@ -121,11 +122,11 @@ SH_HEADERS    = {"X-Shopify-Access-Token": SHOPIFY_TOKEN, "Content-Type": "appli
 # ── Data fetchers ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def load_meta():
-    if not ACCESS_TOKEN:
+    if not ACCESS_TOKEN or not AD_ACCOUNT_ID:
         return None, "No token"
     try:
         def _fetch(params):
-            rows, url = [], f"https://graph.facebook.com/v19.0/{META_ACCOUNT}/insights"
+            rows, url = [], f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/insights"
             p = {"fields": "campaign_name,spend,reach,impressions,clicks,actions,action_values",
                  "level": "campaign", "limit": 100, "access_token": ACCESS_TOKEN, **params}
             while url:
@@ -166,6 +167,102 @@ def load_meta():
         return None, str(e)
 
 @st.cache_data(ttl=300, show_spinner=False)
+def load_instagram():
+    if not ACCESS_TOKEN:
+        return None, "No token"
+    try:
+        def _fetch(params):
+            rows, url = [], f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/insights"
+            p = {"fields": "campaign_name,spend,reach,impressions,clicks,actions,action_values",
+                 "level": "campaign", "limit": 100, "access_token": ACCESS_TOKEN, **params}
+            while url:
+                r = requests.get(url, params=p, timeout=15).json()
+                if "error" in r:
+                    return None, r["error"].get("message", "error")
+                rows.extend(r.get("data", []))
+                url = r.get("paging", {}).get("next"); p = {}
+            return rows, None
+
+        rows_30, _ = _fetch({"date_preset": "last_30d"})
+        rows_all, err = _fetch({"date_preset": "maximum"})
+        if err:
+            return None, err
+
+        def _agg(rows):
+            spend = sum(float(r.get("spend", 0)) for r in rows)
+            reach = sum(int(r.get("reach", 0)) for r in rows)
+            impr  = sum(int(r.get("impressions", 0)) for r in rows)
+            clicks = sum(int(r.get("clicks", 0)) for r in rows)
+            purchases = sum(
+                int(float(a["value"])) for r in rows
+                for a in r.get("actions", []) if a.get("action_type") == "purchase"
+            )
+            conv_val = sum(
+                float(a["value"]) for r in rows
+                for a in (r.get("action_values") or []) if a.get("action_type") == "purchase"
+            )
+            return {"spend": spend, "reach": reach, "impressions": impr,
+                    "clicks": clicks, "purchases": purchases, "conv_value": conv_val}
+
+        d30  = _agg(rows_30 or [])
+        dall = _agg(rows_all or [])
+        return {"30d": d30, "all": dall}, None
+    except Exception as e:
+        return None, str(e)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_quickbooks():
+    try:
+        client_id     = st.secrets["QB_CLIENT_ID"]
+        client_secret = st.secrets["QB_CLIENT_SECRET"]
+        refresh_token = st.secrets.get("QB_REFRESH_TOKEN", "")
+        realm_id      = st.secrets.get("QB_REALM_ID", "")
+        env           = st.secrets.get("QB_ENVIRONMENT", "sandbox")
+        if not refresh_token or not realm_id:
+            return None, "No QuickBooks credentials"
+        import base64 as _b64
+        creds = _b64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+        r = requests.post(
+            "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+            headers={"Authorization": f"Basic {creds}", "Accept": "application/json"},
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            timeout=30,
+        )
+        token_data = r.json()
+        if "access_token" not in token_data:
+            return None, "Token refresh failed"
+        access_token = token_data["access_token"]
+        base_url = "https://quickbooks.api.intuit.com" if env == "production" else "https://sandbox-quickbooks.api.intuit.com"
+        today = date.today()
+        r2 = requests.get(
+            f"{base_url}/v3/company/{realm_id}/reports/ProfitAndLoss",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            params={"start_date": f"{today.year}-01-01", "end_date": today.strftime("%Y-%m-%d"), "accounting_method": "Accrual"},
+            timeout=30,
+        )
+        report = r2.json()
+        net_income, total_income, total_expenses = None, None, None
+        for row in report.get("Rows", {}).get("Row", []):
+            group = row.get("group")
+            cols = row.get("Summary", {}).get("ColData", [])
+            val = None
+            if len(cols) > 1:
+                try:
+                    val = float(cols[1].get("value", 0))
+                except Exception:
+                    pass
+            if row.get("type") == "Section" and group == "NetIncome":
+                net_income = val
+            elif row.get("type") == "Section" and group == "Income":
+                total_income = val
+            elif row.get("type") == "Section" and group == "Expenses":
+                total_expenses = val
+        return {"net_income": net_income, "total_income": total_income,
+                "total_expenses": total_expenses, "year": today.year}, None
+    except Exception as e:
+        return None, str(e)
+
+@st.cache_data(ttl=300, show_spinner=False)
 def load_shopify():
     if not SHOPIFY_TOKEN or not SHOP_URL:
         return None, "No credentials"
@@ -176,7 +273,7 @@ def load_shopify():
         def _orders(params):
             out, url = [], f"{SHOP_URL}/admin/api/2024-01/orders.json"
             p = {"status": "any", "limit": 250,
-                 "fields": "id,created_at,total_price,financial_status,line_items", **params}
+                 "fields": "id,created_at,total_price,financial_status,line_items,customer", **params}
             while url:
                 r = requests.get(url, headers=SH_HEADERS, params=p, timeout=20)
                 out.extend(r.json().get("orders", []))
@@ -194,7 +291,7 @@ def load_shopify():
         orders_all = _orders({})
 
         def _agg(orders):
-            paid = [o for o in orders if o.get("financial_status") == "paid"]
+            paid = [o for o in orders if o.get("financial_status") in ("paid", "partially_refunded")]
             rev  = sum(float(o.get("total_price", 0)) for o in paid)
             aov  = rev / len(paid) if paid else 0
             prod_counts = {}
@@ -203,9 +300,23 @@ def load_shopify():
                     n = li.get("title", "Unknown")
                     prod_counts[n] = prod_counts.get(n, 0) + li.get("quantity", 1)
             top = sorted(prod_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-            return {"revenue": rev, "orders": len(paid), "aov": aov, "top_products": top}
+            units_sold = sum(li.get("quantity", 0) for o in orders for li in o.get("line_items", []))
+            refunded = sum(1 for o in orders if o.get("financial_status") in ("refunded", "partially_refunded"))
+            refund_rate = (refunded / len(orders)) if orders else 0
+            return {"revenue": rev, "orders": len(paid), "aov": aov, "top_products": top,
+                    "units_sold": units_sold, "refund_rate": refund_rate}
 
-        return {"30d": _agg(orders_30), "all": _agg(orders_all)}, None
+        cust_orders = {}
+        for o in orders_all:
+            c = o.get("customer")
+            if c:
+                cust_orders[c["id"]] = cust_orders.get(c["id"], 0) + 1
+        unique_customers = len(cust_orders)
+        repeat_customers = sum(1 for v in cust_orders.values() if v > 1)
+        repeat_rate = (repeat_customers / unique_customers) if unique_customers else 0
+
+        return {"30d": _agg(orders_30), "all": _agg(orders_all),
+                "unique_customers": unique_customers, "repeat_rate": repeat_rate}, None
     except Exception as e:
         return None, str(e)
 
@@ -280,9 +391,11 @@ def load_google():
 
 # ── Load all data ─────────────────────────────────────────────────────────────
 with st.spinner("Connecting to all platforms…"):
-    meta_data,   meta_err   = load_meta()
-    shopify_data, sh_err    = load_shopify()
-    google_data,  google_err = load_google()
+    meta_data,     meta_err     = load_meta()
+    instagram_data, ig_err      = load_instagram()
+    shopify_data,  sh_err       = load_shopify()
+    google_data,   google_err   = load_google()
+    qb_data,       qb_err       = load_quickbooks()
 
 # ── Connection status pills ───────────────────────────────────────────────────
 def _pill(label, ok, color):
@@ -293,19 +406,21 @@ def _pill(label, ok, color):
     return f'<span class="platform-pill" style="background:{bg};border-color:{border};color:{tc};">{dot} {label}</span>'
 
 pills_html = (
-    _pill("Meta Ads",   meta_data   is not None, "59,130,246") +
-    _pill("Instagram",  meta_data   is not None, "236,72,153") +
-    _pill("Shopify",    shopify_data is not None, "34,197,94")  +
-    _pill("Google Ads", google_data  is not None, "245,158,11")
+    _pill("Meta Ads",   meta_data     is not None, "59,130,246") +
+    _pill("Instagram",  instagram_data is not None, "236,72,153") +
+    _pill("Shopify",    shopify_data  is not None, "34,197,94")  +
+    _pill("Google Ads", google_data   is not None, "245,158,11") +
+    _pill("QuickBooks", qb_data       is not None, "168,85,247")
 )
 st.markdown(f'<div style="margin-bottom:1.5rem;">{pills_html}</div>', unsafe_allow_html=True)
 
 # ── Build system prompt with all live data ────────────────────────────────────
-def _build_system(meta, shopify, google):
+def _build_system(meta, instagram, shopify, google, qb):
     today_str = date.today().strftime("%B %d, %Y")
     lines = [
         f"You are the dedicated AI business assistant for Shpapi — a sunglasses and clothing brand. Today is {today_str}.",
-        "You have direct access to live data from all their connected platforms. Answer questions conversationally, directly, and specifically using the actual numbers below.",
+        "You have direct access to live data from all their connected platforms: Meta Ads, Instagram boosts, Shopify, Google Ads, and QuickBooks financials.",
+        "Answer questions conversationally, directly, and specifically using the actual numbers below — not just ad spend. Pull from whichever platform actually answers the question (revenue, orders, profit, refunds, repeat customers, etc.), not only advertising metrics.",
         "Be a trusted advisor — not a corporate consultant. Give real opinions, flag real problems, and suggest specific actions.",
         "If a metric looks bad, say so. If something is working, say why. Always reference the actual numbers.",
         "",
@@ -319,13 +434,27 @@ def _build_system(meta, shopify, google):
         roasAll = mall["conv_value"] / mall["spend"] if mall["spend"] else 0
         lines += [
             "",
-            "META ADS & INSTAGRAM BOOSTS:",
+            "META ADS:",
             f"  Last 30 Days: Spend ${m30['spend']:,.2f} | Reach {m30['reach']:,} | Impressions {m30['impressions']:,} | Clicks {m30['clicks']:,} | Purchases {m30['purchases']} | Conv. Revenue ${m30['conv_value']:,.2f} | ROAS {roas30:.2f}x",
             f"  All Time:     Spend ${mall['spend']:,.2f} | Reach {mall['reach']:,} | Impressions {mall['impressions']:,} | Clicks {mall['clicks']:,} | Purchases {mall['purchases']} | Conv. Revenue ${mall['conv_value']:,.2f} | ROAS {roasAll:.2f}x",
             f"  Active Campaigns: {', '.join(mall['campaigns'][:8]) if mall['campaigns'] else 'none'}",
         ]
     else:
-        lines.append(f"\nMETA ADS & INSTAGRAM: unavailable ({meta_err})")
+        lines.append(f"\nMETA ADS: unavailable ({meta_err})")
+
+    if instagram:
+        i30  = instagram["30d"]
+        iall = instagram["all"]
+        iroas30 = i30["conv_value"] / i30["spend"] if i30["spend"] else 0
+        iroasAll = iall["conv_value"] / iall["spend"] if iall["spend"] else 0
+        lines += [
+            "",
+            "INSTAGRAM BOOSTS:",
+            f"  Last 30 Days: Spend ${i30['spend']:,.2f} | Reach {i30['reach']:,} | Impressions {i30['impressions']:,} | Clicks {i30['clicks']:,} | Purchases {i30['purchases']} | Conv. Revenue ${i30['conv_value']:,.2f} | ROAS {iroas30:.2f}x",
+            f"  All Time:     Spend ${iall['spend']:,.2f} | Reach {iall['reach']:,} | Impressions {iall['impressions']:,} | Clicks {iall['clicks']:,} | Purchases {iall['purchases']} | Conv. Revenue ${iall['conv_value']:,.2f} | ROAS {iroasAll:.2f}x",
+        ]
+    else:
+        lines.append(f"\nINSTAGRAM BOOSTS: unavailable ({ig_err})")
 
     if shopify:
         s30  = shopify["30d"]
@@ -335,8 +464,9 @@ def _build_system(meta, shopify, google):
         lines += [
             "",
             "SHOPIFY:",
-            f"  Last 30 Days: Revenue ${s30['revenue']:,.2f} | {s30['orders']} paid orders | AOV ${s30['aov']:,.2f}",
-            f"  All Time:     Revenue ${sall['revenue']:,.2f} | {sall['orders']} paid orders | AOV ${sall['aov']:,.2f}",
+            f"  Last 30 Days: Revenue ${s30['revenue']:,.2f} | {s30['orders']} paid orders | AOV ${s30['aov']:,.2f} | Units Sold {s30['units_sold']:,} | Refund Rate {s30['refund_rate']*100:.1f}%",
+            f"  All Time:     Revenue ${sall['revenue']:,.2f} | {sall['orders']} paid orders | AOV ${sall['aov']:,.2f} | Units Sold {sall['units_sold']:,} | Refund Rate {sall['refund_rate']*100:.1f}%",
+            f"  Customers: {shopify['unique_customers']:,} unique | Repeat Purchase Rate {shopify['repeat_rate']*100:.1f}%",
             f"  Top Products (30d): {top30}",
             f"  Top Products (All Time): {topAll}",
         ]
@@ -356,18 +486,44 @@ def _build_system(meta, shopify, google):
     else:
         lines.append(f"\nGOOGLE ADS: unavailable ({google_err})")
 
+    if qb and qb.get("net_income") is not None:
+        lines += [
+            "",
+            f"QUICKBOOKS (Year-to-date {qb['year']}, accrual basis):",
+            f"  Net Income: ${qb['net_income']:,.2f}"
+            + (f" | Total Income: ${qb['total_income']:,.2f}" if qb.get("total_income") is not None else "")
+            + (f" | Total Expenses: ${qb['total_expenses']:,.2f}" if qb.get("total_expenses") is not None else ""),
+        ]
+    else:
+        lines.append(f"\nQUICKBOOKS: unavailable ({qb_err})")
+
+    total_ad_spend = sum(
+        p["all"]["spend"] for p in (meta, instagram, google) if p
+    )
+    if shopify and total_ad_spend:
+        roas_blended = shopify["all"]["revenue"] / total_ad_spend
+        cac_est = (total_ad_spend / shopify["unique_customers"]) if shopify["unique_customers"] else None
+        lines += [
+            "",
+            "BLENDED (all channels, all time):",
+            f"  Total Ad Spend (Meta+Instagram+Google): ${total_ad_spend:,.2f}",
+            f"  Blended ROAS (Shopify revenue ÷ total ad spend): {roas_blended:.2f}x",
+        ]
+        if cac_est is not None:
+            lines.append(f"  Estimated CAC (total ad spend ÷ unique customers): ${cac_est:,.2f}")
+
     lines += [
         "",
         "=== INSTRUCTIONS ===",
         "- Answer in plain, direct language. No corporate jargon.",
-        "- Always cite specific numbers from the data above when relevant.",
-        "- If asked about a metric not in the data, say what you can infer and what you'd need to know more.",
+        "- Always cite specific numbers from the data above when relevant, pulling from whichever platform is actually relevant to the question — not defaulting to ad spend.",
+        "- If asked about a metric not in the data (e.g. gross margin, conversion rate, cart abandonment), say plainly that it isn't tracked yet and what would need to be connected to get it.",
         "- If the user asks for ideas or suggestions, make them specific to Shpapi (sunglasses + clothing, lifestyle brand, Meta + Google ads).",
         "- Keep responses focused. If a question is broad, give the most important 2-3 points rather than an exhaustive list.",
     ]
     return "\n".join(lines)
 
-system_prompt = _build_system(meta_data, shopify_data, google_data)
+system_prompt = _build_system(meta_data, instagram_data, shopify_data, google_data, qb_data)
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "ai_messages" not in st.session_state:

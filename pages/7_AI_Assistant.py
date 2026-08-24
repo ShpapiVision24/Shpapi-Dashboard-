@@ -553,9 +553,14 @@ if not st.session_state.ai_messages:
             st.markdown('</div>', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
+def _avatar(role):
+    if role == "user":
+        return LOGO_CROP if os.path.exists(LOGO_CROP) else "🧑"
+    return "🤖"
+
 # ── Chat history ──────────────────────────────────────────────────────────────
 for msg in st.session_state.ai_messages:
-    with st.chat_message(msg["role"]):
+    with st.chat_message(msg["role"], avatar=_avatar(msg["role"])):
         st.markdown(msg["content"])
 
 # ── New message ───────────────────────────────────────────────────────────────
@@ -563,10 +568,10 @@ user_input = st.chat_input("Ask anything about your ads, revenue, or strategy…
 
 if user_input:
     st.session_state.ai_messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=_avatar("user")):
         st.markdown(user_input)
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=_avatar("assistant")):
         with st.spinner("Analyzing your data…"):
             try:
                 import anthropic as _ant

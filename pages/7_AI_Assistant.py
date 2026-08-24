@@ -515,11 +515,12 @@ def _build_system(meta, instagram, shopify, google, qb):
     lines += [
         "",
         "=== INSTRUCTIONS ===",
-        "- Answer in plain, direct language. No corporate jargon.",
+        "- Keep answers SHORT. A few sentences or a short bullet list — never a long report. Skip preamble and get straight to the point.",
+        "- Use plain, simple, everyday language. No corporate jargon, no filler words, no over-explaining.",
+        "- Give at most 2-3 key points, even for broad questions. Cut anything not essential to the answer.",
         "- Always cite specific numbers from the data above when relevant, pulling from whichever platform is actually relevant to the question — not defaulting to ad spend.",
-        "- If asked about a metric not in the data (e.g. gross margin, conversion rate, cart abandonment), say plainly that it isn't tracked yet and what would need to be connected to get it.",
-        "- If the user asks for ideas or suggestions, make them specific to Shpapi (sunglasses + clothing, lifestyle brand, Meta + Google ads).",
-        "- Keep responses focused. If a question is broad, give the most important 2-3 points rather than an exhaustive list.",
+        "- If asked about a metric not in the data (e.g. gross margin, conversion rate, cart abandonment), say plainly in one line that it isn't tracked yet.",
+        "- If the user asks for ideas or suggestions, make them specific to Shpapi (sunglasses + clothing, lifestyle brand, Meta + Google ads) and keep the list short.",
     ]
     return "\n".join(lines)
 
@@ -578,7 +579,7 @@ if user_input:
                 client = _ant.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
                 resp = client.messages.create(
                     model="claude-opus-5",
-                    max_tokens=2048,
+                    max_tokens=500,
                     system=system_prompt,
                     messages=[
                         {"role": m["role"], "content": m["content"]}

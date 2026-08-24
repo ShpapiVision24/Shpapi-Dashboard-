@@ -85,7 +85,7 @@ a[data-testid="stPageLink-NavLink"] svg {{ display: none !important; }}
 </style>
 """, unsafe_allow_html=True)
 
-_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 1.0, 1.0, 0.9, 1.0, 0.1])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.0, 1.0, 0.9, 1.0, 0.1])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -97,8 +97,6 @@ with _c_s:
     st.markdown(f'<div style="padding-top:1.1rem;"><span style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.8rem;font-weight:700;color:{BLUE};background:rgba(59,130,246,0.18);white-space:nowrap;">Shopify</span></div>', unsafe_allow_html=True)
 with _c_g:
     st.page_link("pages/3_Google_Ads.py", label="Google Ads")
-with _c_qb:
-    st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
 with _c_ig:
     st.page_link("pages/5_Instagram.py", label="Instagram")
 with _c_rp:

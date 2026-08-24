@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-import base64
 import os
 from datetime import timedelta, date
 from PIL import Image
@@ -230,7 +229,7 @@ div[data-testid="stForm"] {{ border: none !important; }}
 """, unsafe_allow_html=True)
 
 # Nav bar
-_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 1.0, 1.0, 0.9, 1.0, 0.1])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.0, 1.0, 0.9, 1.0, 0.1])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -242,8 +241,6 @@ with _c_s:
     st.page_link("pages/2_Shopify.py", label="Shopify")
 with _c_g:
     st.page_link("pages/3_Google_Ads.py", label="Google Ads")
-with _c_qb:
-    st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
 with _c_ig:
     st.page_link("pages/5_Instagram.py", label="Instagram")
 with _c_rp:
@@ -367,50 +364,6 @@ def get_business_insights():
         return None
 
 @st.cache_data(ttl=3600)
-def get_qb_summary():
-    try:
-        import datetime as dt
-        client_id     = st.secrets["QB_CLIENT_ID"]
-        client_secret = st.secrets["QB_CLIENT_SECRET"]
-        refresh_token = st.secrets.get("QB_REFRESH_TOKEN", "")
-        realm_id      = st.secrets.get("QB_REALM_ID", "")
-        env           = st.secrets.get("QB_ENVIRONMENT", "sandbox")
-        if not refresh_token or not realm_id:
-            return None
-        creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-        r = requests.post(
-            "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
-            headers={"Authorization": f"Basic {creds}", "Accept": "application/json"},
-            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
-            timeout=30,
-        )
-        token_data = r.json()
-        if "access_token" not in token_data:
-            return None
-        access_token = token_data["access_token"]
-        base_url = "https://quickbooks.api.intuit.com" if env == "production" else "https://sandbox-quickbooks.api.intuit.com"
-        now = dt.datetime.now()
-        r2 = requests.get(
-            f"{base_url}/v3/company/{realm_id}/reports/ProfitAndLoss",
-            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-            params={"start_date": f"{now.year}-01-01", "end_date": now.strftime("%Y-%m-%d"), "accounting_method": "Accrual"},
-            timeout=30,
-        )
-        report = r2.json()
-        net_income = None
-        for row in report.get("Rows", {}).get("Row", []):
-            if row.get("type") == "Section" and row.get("group") == "NetIncome":
-                cols = row.get("Summary", {}).get("ColData", [])
-                if len(cols) > 1:
-                    try:
-                        net_income = float(cols[1].get("value", 0))
-                    except Exception:
-                        pass
-        return {"net_income": net_income}
-    except Exception:
-        return None
-
-@st.cache_data(ttl=3600)
 def get_google_ads_summary():
     try:
         from google.ads.googleads.client import GoogleAdsClient
@@ -465,7 +418,6 @@ def get_instagram_summary():
 with st.spinner("Loading overview..."):
     meta      = get_meta_summary()
     shopify   = get_shopify_summary()
-    qb        = get_qb_summary()
     instagram = get_instagram_summary()
     google    = get_google_ads_summary()
     insights  = get_business_insights()
@@ -552,8 +504,6 @@ if st.session_state.ai_messages:
                     shop_ctx = (f"Revenue ${shopify['revenue_30d']:,.2f} (last 30d) | "
                                 f"Orders {shopify['orders_30d']} (30d) | "
                                 f"Total orders all-time {shopify['total_orders']}") if shopify else "unavailable"
-                    qb_ctx   = (f"Net Income YTD ${qb['net_income']:,.2f}"
-                                if qb and qb.get("net_income") is not None else "unavailable")
                     ig_ctx   = (f"Spend ${instagram['spend']:,.2f} | Reach {instagram['reach']:,} | "
                                 f"Impressions {instagram['impressions']:,}") if instagram else "unavailable"
                     g_ctx    = (f"Spend ${google['spend']:,.2f} | Clicks {google['clicks']:,} | "
@@ -567,8 +517,7 @@ LIVE DATA (all-time unless noted):
 - Meta Ads: {meta_ctx}
 - Instagram Boosts: {ig_ctx}
 - Shopify: {shop_ctx}
-- Google Ads: {g_ctx}
-- QuickBooks: {qb_ctx}"""
+- Google Ads: {g_ctx}"""
                     resp = client.messages.create(
                         model="claude-opus-5",
                         max_tokens=600,

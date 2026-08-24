@@ -60,7 +60,7 @@ a[data-testid="stPageLink-NavLink"] svg {{ display: none !important; }}
 """, unsafe_allow_html=True)
 
 # ── Nav ──────────────────────────────────────────────────────────────────────
-_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.3, 1.0, 1.0, 0.9, 1.0, 0.1])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 1, 1, 1, 1.2, 1.0, 1.0, 0.9, 1.0, 0.1])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -72,8 +72,6 @@ with _c_s:
     st.page_link("pages/2_Shopify.py", label="Shopify")
 with _c_g:
     st.page_link("pages/3_Google_Ads.py", label="Google Ads")
-with _c_qb:
-    st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
 with _c_ig:
     st.page_link("pages/5_Instagram.py", label="Instagram")
 with _c_rp:
@@ -175,12 +173,32 @@ for o in orders:
         </div>
         """, unsafe_allow_html=True)
 
-        k1, k2, k3, k4 = st.columns(4)
+        k0, k1, k2, k3, k4 = st.columns(5)
+        k0.metric("Styles Ordered", f"{len(styles)}")
         k1.metric("Product Subtotal", f"${fees['product_subtotal']:,.2f}")
         k2.metric("Shipping + Fees", f"${fees['shipping'] + fees['logo_cost'] + fees['lens_fee'] + fees['discount']:,.2f}")
         k3.metric("Total Paid", f"${fees['total']:,.2f}")
         k4.metric(f"Est. Margin @ ${sell_price:,.0f}", f"{order_margin:.1f}%", f"${order_profit:,.2f} est. profit")
 
+        st.markdown(f'<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:1rem 0 0.5rem;">Units Ordered per Style</div>', unsafe_allow_html=True)
+        style_rows = []
+        for m in styles:
+            m_items = [i for i in items if i["model"] == m]
+            m_qty = sum(i["qty"] for i in m_items)
+            m_cost = sum(i["amount"] for i in m_items)
+            m_rev = m_qty * sell_price
+            m_margin = ((m_rev - m_cost) / m_rev * 100) if m_rev else 0
+            style_rows.append({
+                "Model": m,
+                "Colors Ordered": len(m_items),
+                "Qty per Color": ", ".join(str(i["qty"]) for i in m_items),
+                "Total Units": m_qty,
+                "Total Cost": f"${m_cost:,.2f}",
+                "Est. Margin": f"{m_margin:.1f}%",
+            })
+        st.dataframe(style_rows, use_container_width=True, hide_index=True)
+
+        st.markdown(f'<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};margin:1rem 0 0.5rem;">Full Line-Item Detail</div>', unsafe_allow_html=True)
         rows = []
         for i in items:
             rev = i["qty"] * sell_price

@@ -83,7 +83,7 @@ div[data-testid="stChatInput"] textarea {{
 """, unsafe_allow_html=True)
 
 # ── Nav ───────────────────────────────────────────────────────────────────────
-_c_logo, _c_h, _c_m, _c_s, _c_g, _c_qb, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 0.9, 1, 0.9, 1.1, 1.2, 1.0, 0.95, 0.9, 0.95, 0.1])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 0.9, 1, 0.9, 1.1, 1.0, 0.95, 0.9, 0.95, 0.1])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -95,8 +95,6 @@ with _c_s:
     st.page_link("pages/2_Shopify.py", label="Shopify")
 with _c_g:
     st.page_link("pages/3_Google_Ads.py", label="Google Ads")
-with _c_qb:
-    st.page_link("pages/4_QuickBooks.py", label="QuickBooks")
 with _c_ig:
     st.page_link("pages/5_Instagram.py", label="Instagram")
 with _c_rp:
@@ -209,58 +207,6 @@ def load_instagram():
         d30  = _agg(rows_30 or [])
         dall = _agg(rows_all or [])
         return {"30d": d30, "all": dall}, None
-    except Exception as e:
-        return None, str(e)
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def load_quickbooks():
-    try:
-        client_id     = st.secrets["QB_CLIENT_ID"]
-        client_secret = st.secrets["QB_CLIENT_SECRET"]
-        refresh_token = st.secrets.get("QB_REFRESH_TOKEN", "")
-        realm_id      = st.secrets.get("QB_REALM_ID", "")
-        env           = st.secrets.get("QB_ENVIRONMENT", "sandbox")
-        if not refresh_token or not realm_id:
-            return None, "No QuickBooks credentials"
-        import base64 as _b64
-        creds = _b64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-        r = requests.post(
-            "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
-            headers={"Authorization": f"Basic {creds}", "Accept": "application/json"},
-            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
-            timeout=30,
-        )
-        token_data = r.json()
-        if "access_token" not in token_data:
-            return None, "Token refresh failed"
-        access_token = token_data["access_token"]
-        base_url = "https://quickbooks.api.intuit.com" if env == "production" else "https://sandbox-quickbooks.api.intuit.com"
-        today = date.today()
-        r2 = requests.get(
-            f"{base_url}/v3/company/{realm_id}/reports/ProfitAndLoss",
-            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-            params={"start_date": f"{today.year}-01-01", "end_date": today.strftime("%Y-%m-%d"), "accounting_method": "Accrual"},
-            timeout=30,
-        )
-        report = r2.json()
-        net_income, total_income, total_expenses = None, None, None
-        for row in report.get("Rows", {}).get("Row", []):
-            group = row.get("group")
-            cols = row.get("Summary", {}).get("ColData", [])
-            val = None
-            if len(cols) > 1:
-                try:
-                    val = float(cols[1].get("value", 0))
-                except Exception:
-                    pass
-            if row.get("type") == "Section" and group == "NetIncome":
-                net_income = val
-            elif row.get("type") == "Section" and group == "Income":
-                total_income = val
-            elif row.get("type") == "Section" and group == "Expenses":
-                total_expenses = val
-        return {"net_income": net_income, "total_income": total_income,
-                "total_expenses": total_expenses, "year": today.year}, None
     except Exception as e:
         return None, str(e)
 
@@ -397,7 +343,6 @@ with st.spinner("Connecting to all platforms…"):
     instagram_data, ig_err      = load_instagram()
     shopify_data,  sh_err       = load_shopify()
     google_data,   google_err   = load_google()
-    qb_data,       qb_err       = load_quickbooks()
 
 # ── Connection status pills ───────────────────────────────────────────────────
 def _pill(label, ok, color):
@@ -411,17 +356,16 @@ pills_html = (
     _pill("Meta Ads",   meta_data     is not None, "59,130,246") +
     _pill("Instagram",  instagram_data is not None, "236,72,153") +
     _pill("Shopify",    shopify_data  is not None, "34,197,94")  +
-    _pill("Google Ads", google_data   is not None, "245,158,11") +
-    _pill("QuickBooks", qb_data       is not None, "168,85,247")
+    _pill("Google Ads", google_data   is not None, "245,158,11")
 )
 st.markdown(f'<div style="margin-bottom:1.5rem;">{pills_html}</div>', unsafe_allow_html=True)
 
 # ── Build system prompt with all live data ────────────────────────────────────
-def _build_system(meta, instagram, shopify, google, qb):
+def _build_system(meta, instagram, shopify, google):
     today_str = date.today().strftime("%B %d, %Y")
     lines = [
         f"You are the dedicated AI business assistant for Shpapi — a sunglasses and clothing brand. Today is {today_str}.",
-        "You have direct access to live data from all their connected platforms: Meta Ads, Instagram boosts, Shopify, Google Ads, and QuickBooks financials.",
+        "You have direct access to live data from all their connected platforms: Meta Ads, Instagram boosts, Shopify, and Google Ads.",
         "Answer questions conversationally, directly, and specifically using the actual numbers below — not just ad spend. Pull from whichever platform actually answers the question (revenue, orders, profit, refunds, repeat customers, etc.), not only advertising metrics.",
         "Be a trusted advisor — not a corporate consultant. Give real opinions, flag real problems, and suggest specific actions.",
         "If a metric looks bad, say so. If something is working, say why. Always reference the actual numbers.",
@@ -488,17 +432,6 @@ def _build_system(meta, instagram, shopify, google, qb):
     else:
         lines.append(f"\nGOOGLE ADS: unavailable ({google_err})")
 
-    if qb and qb.get("net_income") is not None:
-        lines += [
-            "",
-            f"QUICKBOOKS (Year-to-date {qb['year']}, accrual basis):",
-            f"  Net Income: ${qb['net_income']:,.2f}"
-            + (f" | Total Income: ${qb['total_income']:,.2f}" if qb.get("total_income") is not None else "")
-            + (f" | Total Expenses: ${qb['total_expenses']:,.2f}" if qb.get("total_expenses") is not None else ""),
-        ]
-    else:
-        lines.append(f"\nQUICKBOOKS: unavailable ({qb_err})")
-
     total_ad_spend = sum(
         p["all"]["spend"] for p in (meta, instagram, google) if p
     )
@@ -526,7 +459,7 @@ def _build_system(meta, instagram, shopify, google, qb):
     ]
     return "\n".join(lines)
 
-system_prompt = _build_system(meta_data, instagram_data, shopify_data, google_data, qb_data)
+system_prompt = _build_system(meta_data, instagram_data, shopify_data, google_data)
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "ai_messages" not in st.session_state:

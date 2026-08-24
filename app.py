@@ -127,6 +127,46 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
     margin-bottom: 1.2rem;
 }}
 .section {{ font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; color: {T3}; margin: 0 0 0.9rem 0; display: flex; align-items: center; gap: 1rem; }}
+.insights-block {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 16px;
+    padding: 1.6rem;
+    margin-bottom: 2rem;
+}}
+.insights-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1.4rem;
+}}
+.insight-label {{
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: {T3};
+    margin-bottom: 0.5rem;
+}}
+.insight-value {{
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    line-height: 1;
+}}
+.insight-sub {{
+    font-size: 0.68rem;
+    color: {T3};
+    margin-top: 0.4rem;
+}}
+.insights-footnote {{
+    font-size: 0.68rem;
+    color: {T3};
+    margin-top: 1.4rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid {BORDER};
+    line-height: 1.5;
+}}
 .section::after {{ content: ''; flex: 1; height: 1px; background: {BORDER}; }}
 div[data-testid="stPageLink"] {{
     border: none !important; background: none !important; box-shadow: none !important;
@@ -261,6 +301,69 @@ def get_shopify_summary():
     except:
         return None
 
+@st.cache_data(ttl=1800)
+def get_business_insights():
+    try:
+        import datetime as dt
+        all_orders = []
+        url = f"{SHOP_URL}/admin/api/2024-01/orders.json"
+        params = {"status": "any", "limit": 250,
+                  "fields": "id,created_at,total_price,financial_status,line_items,customer"}
+        while url:
+            r = requests.get(url, headers=SHOPIFY_HEADERS, params=params, timeout=15)
+            data = r.json()
+            all_orders.extend(data.get("orders", []))
+            next_url = None
+            for part in r.headers.get("Link", "").split(","):
+                if 'rel="next"' in part:
+                    next_url = part.split(";")[0].strip().strip("<>")
+            url, params = next_url, None
+
+        now = dt.datetime.now(dt.timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        revenue_orders = [o for o in all_orders if o.get("financial_status") in ("paid", "partially_refunded")]
+        total_revenue  = sum(float(o["total_price"]) for o in revenue_orders)
+        revenue_mtd    = sum(float(o["total_price"]) for o in revenue_orders
+                              if dt.datetime.fromisoformat(o["created_at"]) >= month_start)
+
+        total_orders = len(all_orders)
+        orders_mtd   = sum(1 for o in all_orders if dt.datetime.fromisoformat(o["created_at"]) >= month_start)
+        units_sold   = sum(item.get("quantity", 0) for o in all_orders for item in o.get("line_items", []))
+        aov          = (total_revenue / len(revenue_orders)) if revenue_orders else 0
+
+        refunded     = sum(1 for o in all_orders if o.get("financial_status") in ("refunded", "partially_refunded"))
+        refund_rate  = (refunded / total_orders) if total_orders else 0
+
+        cust_orders, cust_first_date = {}, {}
+        for o in all_orders:
+            c = o.get("customer")
+            if not c:
+                continue
+            cid = c["id"]
+            cust_orders[cid] = cust_orders.get(cid, 0) + 1
+            d = dt.datetime.fromisoformat(o["created_at"])
+            if cid not in cust_first_date or d < cust_first_date[cid]:
+                cust_first_date[cid] = d
+
+        unique_customers = len(cust_orders)
+        repeat_customers = sum(1 for v in cust_orders.values() if v > 1)
+        repeat_rate       = (repeat_customers / unique_customers) if unique_customers else 0
+
+        return {
+            "total_revenue": total_revenue,
+            "revenue_mtd": revenue_mtd,
+            "total_orders": total_orders,
+            "orders_mtd": orders_mtd,
+            "units_sold": units_sold,
+            "aov": aov,
+            "refund_rate": refund_rate,
+            "repeat_rate": repeat_rate,
+            "unique_customers": unique_customers,
+        }
+    except Exception:
+        return None
+
 @st.cache_data(ttl=3600)
 def get_qb_summary():
     try:
@@ -363,6 +466,45 @@ with st.spinner("Loading overview..."):
     qb        = get_qb_summary()
     instagram = get_instagram_summary()
     google    = get_google_ads_summary()
+    insights  = get_business_insights()
+
+# ── Business Insights ──────────────────────────────────────────────────────────
+st.markdown('<div class="section">Business Insights</div>', unsafe_allow_html=True)
+
+if insights:
+    total_spend = sum(x["spend"] for x in (meta, google, instagram) if x)
+    roas = (insights["total_revenue"] / total_spend) if total_spend else None
+    cac  = (total_spend / insights["unique_customers"]) if total_spend and insights["unique_customers"] else None
+
+    tiles = [
+        ("Total Revenue", f"${insights['total_revenue']:,.2f}", "All time"),
+        ("Revenue MTD", f"${insights['revenue_mtd']:,.2f}", "Month to date"),
+        ("Orders", f"{insights['total_orders']:,}", f"{insights['orders_mtd']:,} MTD"),
+        ("Units Sold", f"{insights['units_sold']:,}", "All time"),
+        ("Avg. Order Value", f"${insights['aov']:,.2f}", "Revenue ÷ orders"),
+        ("ROAS", f"{roas:.2f}x" if roas is not None else "—", "Revenue ÷ ad spend"),
+        ("Est. CAC", f"${cac:,.2f}" if cac is not None else "—", "Ad spend ÷ customers"),
+        ("Repeat Purchase Rate", f"{insights['repeat_rate']*100:.1f}%", "Customers who bought again"),
+        ("Refund Rate", f"{insights['refund_rate']*100:.1f}%", "Of all orders"),
+    ]
+    tiles_html = "".join(f"""
+      <div class="insight-tile">
+        <div class="insight-label">{label}</div>
+        <div class="insight-value">{value}</div>
+        <div class="insight-sub">{sub}</div>
+      </div>""" for label, value, sub in tiles)
+
+    st.markdown(f"""
+    <div class="insights-block">
+      <div class="insights-grid">{tiles_html}</div>
+      <div class="insights-footnote">
+        Gross/net margin, conversion rate, cart abandonment, checkout funnel, and channel-level CAC/ROAS
+        need additional setup (product cost data, and site/session tracking) not yet connected.
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f'<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;padding:1.5rem;text-align:center;color:{T3};font-size:0.85rem;">Business insights unavailable — could not load Shopify order data.</div>', unsafe_allow_html=True)
 
 # ── AI Growth Analyst (inline, above platform cards) ──────────────────────────
 st.markdown('<div class="section">AI Growth Analyst</div>', unsafe_allow_html=True)

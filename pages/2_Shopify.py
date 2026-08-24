@@ -234,27 +234,65 @@ if not df_90d.empty:
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Top products
-st.markdown('<div class="section">Top Products by Revenue</div>', unsafe_allow_html=True)
+st.markdown('<div class="section">Most Ordered Styles</div>', unsafe_allow_html=True)
+
+@st.cache_data(ttl=1800)
+def get_product_collections(product_ids):
+    ids = list(product_ids)
+    if not ids:
+        return {}
+    query_parts = []
+    for i, pid in enumerate(ids):
+        query_parts.append(
+            f'p{i}: product(id: "gid://shopify/Product/{pid}") {{ collections(first: 10) {{ edges {{ node {{ title }} }} }} }}'
+        )
+    query = "{ " + " ".join(query_parts) + " }"
+    try:
+        r = requests.post(f"{SHOP_URL}/admin/api/2024-01/graphql.json",
+                           headers=HEADERS, json={"query": query}, timeout=20)
+        data = r.json().get("data", {})
+    except Exception:
+        return {}
+    result = {}
+    for i, pid in enumerate(ids):
+        node = data.get(f"p{i}")
+        if not node:
+            continue
+        titles = [e["node"]["title"] for e in node.get("collections", {}).get("edges", [])]
+        titles = [t for t in titles if t.lower() != "all"]
+        result[pid] = titles
+    return result
+
 product_rows = []
 for o in orders_raw:
     if o.get("financial_status") == "paid":
         for item in o.get("line_items", []):
             product_rows.append({
-                "Product":  item.get("title", "Unknown"),
-                "Qty":      int(item.get("quantity", 0)),
-                "Revenue":  float(item.get("price", 0)) * int(item.get("quantity", 0)),
+                "Product":    item.get("title", "Unknown"),
+                "Product ID": item.get("product_id"),
+                "Qty":        int(item.get("quantity", 0)),
+                "Revenue":    float(item.get("price", 0)) * int(item.get("quantity", 0)),
             })
+
 if product_rows:
     df_products = (pd.DataFrame(product_rows)
-                   .groupby("Product", as_index=False)
+                   .groupby(["Product", "Product ID"], as_index=False, dropna=False)
                    .agg({"Qty": "sum", "Revenue": "sum"})
-                   .sort_values("Revenue", ascending=False)
-                   .head(10))
+                   .sort_values("Qty", ascending=False)
+                   .head(15))
+
+    valid_ids = tuple(int(pid) for pid in df_products["Product ID"] if pd.notna(pid))
+    collections_map = get_product_collections(valid_ids)
+    df_products["Collections"] = df_products["Product ID"].map(
+        lambda pid: (", ".join(collections_map.get(int(pid), [])) or "—") if pd.notna(pid) else "—"
+    )
+    df_products = df_products[["Product", "Collections", "Qty", "Revenue"]]
+
     st.dataframe(
         df_products.style
-            .background_gradient(subset=["Revenue"], cmap="Blues")
+            .background_gradient(subset=["Qty"], cmap="Blues")
             .format({"Revenue": "${:,.2f}"}),
-        use_container_width=True, height=350,
+        use_container_width=True, height=470,
     )
 
 # Recent orders table

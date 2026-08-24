@@ -560,7 +560,7 @@ else:
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(150, 165, 190)
         pdf.set_xy(0, 20)
-        pdf.cell(210, 6, f"Analytics Dashboard Export  —  {date.today().strftime('%B %d, %Y')}", align="C")
+        pdf.cell(210, 6, f"Analytics Dashboard Export  -  {date.today().strftime('%B %d, %Y')}", align="C")
         pdf.set_y(46)
 
         def _section(title):
@@ -603,32 +603,32 @@ else:
 
         # Meta Ads
         _card(x1, y0, cw, ch, "Meta Ads", [
-            ("Total Spend (All Time)", f"${meta['spend']:,.2f}" if meta else "—"),
-            ("Link Clicks",            f"{meta['clicks']:,}"   if meta else "—"),
-            ("Impressions",            f"{meta['impressions']:,}" if meta else "—"),
+            ("Total Spend (All Time)", f"${meta['spend']:,.2f}" if meta else "-"),
+            ("Link Clicks",            f"{meta['clicks']:,}"   if meta else "-"),
+            ("Impressions",            f"{meta['impressions']:,}" if meta else "-"),
         ], (59, 130, 246))
 
         # Shopify
         _card(x2, y0, cw, ch, "Shopify", [
-            ("Revenue (Last 30 Days)", f"${shopify['revenue_30d']:,.2f}" if shopify else "—"),
-            ("Orders (Last 30 Days)",  f"{shopify['orders_30d']:,}"       if shopify else "—"),
-            ("Total Orders (All Time)",f"{shopify['total_orders']:,}"     if shopify else "—"),
+            ("Revenue (Last 30 Days)", f"${shopify['revenue_30d']:,.2f}" if shopify else "-"),
+            ("Orders (Last 30 Days)",  f"{shopify['orders_30d']:,}"       if shopify else "-"),
+            ("Total Orders (All Time)",f"{shopify['total_orders']:,}"     if shopify else "-"),
         ], (34, 197, 94))
 
         y1 = y0 + ch + gap
 
         # Google Ads
         _card(x1, y1, cw, ch, "Google Ads", [
-            ("Total Spend (All Time)", f"${google['spend']:,.2f}"       if google else "—"),
-            ("Clicks",                 f"{google['clicks']:,}"           if google else "—"),
-            ("Impressions",            f"{google['impressions']:,}"      if google else "—"),
+            ("Total Spend (All Time)", f"${google['spend']:,.2f}"       if google else "-"),
+            ("Clicks",                 f"{google['clicks']:,}"           if google else "-"),
+            ("Impressions",            f"{google['impressions']:,}"      if google else "-"),
         ], (139, 92, 246))
 
         # Instagram
         _card(x2, y1, cw, ch, "Instagram Boosts", [
-            ("Total Spend (All Time)", f"${instagram['spend']:,.2f}"     if instagram else "—"),
-            ("Reach",                  f"{instagram['reach']:,}"          if instagram else "—"),
-            ("Impressions",            f"{instagram['impressions']:,}"    if instagram else "—"),
+            ("Total Spend (All Time)", f"${instagram['spend']:,.2f}"     if instagram else "-"),
+            ("Reach",                  f"{instagram['reach']:,}"          if instagram else "-"),
+            ("Impressions",            f"{instagram['impressions']:,}"    if instagram else "-"),
         ], (236, 72, 153))
 
         pdf.set_y(y1 + ch + 10)

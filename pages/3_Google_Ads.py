@@ -198,8 +198,25 @@ with st.spinner("Loading Google Ads data…"):
     df, error = fetch_google_ads_data(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
 if error:
+    needs_2fa = "two_step_verification_not_enrolled" in error.lower() or "2-step verification" in error.lower()
     needs_basic = "developer token" in error.lower() or "test" in error.lower() or "authorization" in error.lower()
-    if needs_basic:
+    if needs_2fa:
+        st.markdown(f"""
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:12px;padding:2rem;text-align:center;margin-top:2rem;">
+            <div style="font-size:1.1rem;font-weight:700;color:{T1};margin-bottom:0.6rem;">2-Step Verification Required</div>
+            <div style="font-size:0.85rem;color:{T2};max-width:520px;margin:0 auto 1.2rem;">
+                Google now requires the account connected to this Google Ads integration to have
+                <strong>2-Step Verification</strong> enabled. Turn it on for that Google account,
+                then generate a fresh refresh token and update it in the app secrets.
+            </div>
+            <div style="font-size:0.75rem;color:{T3};">
+                1. Enable 2FA at <a href="https://myaccount.google.com/security" target="_blank" style="color:{BLUE};">myaccount.google.com/security</a> &nbsp;·&nbsp;
+                2. Regenerate the refresh token &nbsp;·&nbsp;
+                3. Update <code>google_ads.refresh_token</code> in Streamlit secrets
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif needs_basic:
         st.markdown(f"""
         <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:12px;padding:2rem;text-align:center;margin-top:2rem;">
             <div style="font-size:1.1rem;font-weight:700;color:{T1};margin-bottom:0.6rem;">Basic API Access Required</div>

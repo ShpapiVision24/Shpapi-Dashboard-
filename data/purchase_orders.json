@@ -1,0 +1,51 @@
+{
+  "orders": [
+    {
+      "id": "PO-2502",
+      "name": "Collection 111",
+      "supplier": "Shenzhen Sifier Technology Co., Ltd.",
+      "date": "2025-10-17",
+      "items": [
+        {"model": "9133",       "color": "C1 LB", "size": "46-24-145", "note": "",                          "qty": 15, "unit_cost": 15.90, "amount": 238.50},
+        {"model": "9133",       "color": "C1 YW", "size": "46-24-145", "note": "",                          "qty": 20, "unit_cost": 15.90, "amount": 318.00},
+        {"model": "9133",       "color": "C3 GY", "size": "46-24-145", "note": "Change to mirror lens",     "qty": 15, "unit_cost": 15.90, "amount": 238.50},
+        {"model": "9133",       "color": "C4 GBN","size": "46-24-145", "note": "",                          "qty": 10, "unit_cost": 15.90, "amount": 159.00},
+        {"model": "9133",       "color": "C6",    "size": "46-24-145", "note": "Change gradient green lens","qty": 15, "unit_cost": 15.90, "amount": 238.50},
+        {"model": "AIR-9057",   "color": "C1",    "size": "52-20-145", "note": "",                          "qty": 15, "unit_cost": 20.90, "amount": 313.50},
+        {"model": "AIR-9057",   "color": "C4",    "size": "52-20-145", "note": "",                          "qty": 15, "unit_cost": 20.90, "amount": 313.50},
+        {"model": "DY-8108-A",  "color": "C5",    "size": "53-17-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "DY-8108-A",  "color": "C7",    "size": "53-17-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "AIR-9106",   "color": "C3",    "size": "49-19-145", "note": "Change to blue light lens", "qty": 10, "unit_cost": 17.90, "amount": 179.00},
+        {"model": "AIR-9114",   "color": "C3",    "size": "50-21-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "AIR-9114",   "color": "C4",    "size": "50-21-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "AIR-9114",   "color": "C5",    "size": "50-21-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "SUN-9115",   "color": "C2",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "SUN-9115",   "color": "C3",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "SUN-9115",   "color": "C4",    "size": "48-23-145", "note": "",                          "qty": 10, "unit_cost": 19.90, "amount": 199.00},
+        {"model": "SUN-9115",   "color": "C5",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "SUN-9115",   "color": "C7",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "SUN-9115",   "color": "C9",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
+        {"model": "BAI-7133",   "color": "C1",    "size": "50-18-140", "note": "",                          "qty": 10, "unit_cost": 18.90, "amount": 189.00},
+        {"model": "BAI-7133",   "color": "C4",    "size": "50-18-140", "note": "",                          "qty": 15, "unit_cost": 18.90, "amount": 283.50},
+        {"model": "BAI-7133",   "color": "C5",    "size": "50-18-140", "note": "Already blue light lens",   "qty": 15, "unit_cost": 18.90, "amount": 283.50},
+        {"model": "BAI-7133",   "color": "C6",    "size": "50-18-140", "note": "",                          "qty": 10, "unit_cost": 18.90, "amount": 189.00},
+        {"model": "BSU-7128",   "color": "C2",    "size": "49-21-145", "note": "",                          "qty": 1,  "unit_cost": 22.90, "amount": 22.90},
+        {"model": "BEA1-7072",  "color": "C4",    "size": "46-23-145", "note": "",                          "qty": 10, "unit_cost": 13.90, "amount": 139.00},
+        {"model": "AIR-9107",   "color": "C1",    "size": "49-19-145", "note": "Change to mirror lens",     "qty": 5,  "unit_cost": 17.90, "amount": 89.50},
+        {"model": "AIR-9107",   "color": "C3",    "size": "49-19-145", "note": "Change to blue light lens", "qty": 10, "unit_cost": 17.90, "amount": 179.00},
+        {"model": "BEA1-7072",  "color": "C2",    "size": "46-23-145", "note": "Change to blue light lens", "qty": 10, "unit_cost": 13.90, "amount": 139.00}
+      ],
+      "fees": {
+        "product_subtotal": 6696.90,
+        "logo_cost": 375.00,
+        "logo_cost_note": "9057, 8108, 9106, 7072, 9107 @ $75/style",
+        "shipping": 420.00,
+        "shipping_note": "DDP",
+        "discount": -669.69,
+        "lens_fee": 223.50,
+        "lens_fee_note": "Mirror $6.5/pc, blue light $1.5/pc, gradient green $4.9/pc",
+        "total": 7045.71
+      }
+    }
+  ]
+}

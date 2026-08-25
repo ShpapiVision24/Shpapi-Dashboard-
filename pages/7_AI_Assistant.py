@@ -83,7 +83,7 @@ div[data-testid="stChatInput"] textarea {{
 """, unsafe_allow_html=True)
 
 # ── Nav ───────────────────────────────────────────────────────────────────────
-_c_logo, _c_h, _c_m, _c_s, _c_g, _c_ig, _c_rp, _c_ai, _c_inv, _ = st.columns([1.5, 0.9, 1, 0.9, 1.1, 1.0, 0.95, 0.9, 0.95, 0.1])
+_c_logo, _c_h, _c_m, _c_s, _c_g, _c_ig, _c_rp, _c_ai, _c_inv, _c_ugc, _ = st.columns([1.5, 0.9, 1, 0.9, 1.1, 1.0, 0.95, 0.9, 0.95, 1.3, 0.1])
 with _c_logo:
     if os.path.exists(LOGO_CROP):
         st.image(LOGO_CROP, width=90)
@@ -103,6 +103,8 @@ with _c_ai:
     st.markdown(f'<div style="padding-top:1.1rem;"><span style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.8rem;font-weight:700;color:{PURPLE};background:rgba(168,85,247,0.18);white-space:nowrap;">AI Chat</span></div>', unsafe_allow_html=True)
 with _c_inv:
     st.page_link("pages/8_Inventory.py", label="Inventory")
+with _c_ugc:
+    st.page_link("pages/9_UGC_Creators.py", label="UGC Creators")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 1.5rem;"></div>', unsafe_allow_html=True)
 
 st.markdown(f"""

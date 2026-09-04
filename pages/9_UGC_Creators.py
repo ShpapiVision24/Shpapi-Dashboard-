@@ -2,12 +2,17 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import sys
 import uuid
 from datetime import date
 
-ASSETS    = os.path.join(os.path.dirname(__file__), "..", "assets")
-LOGO_CROP = os.path.join(ASSETS, "logo_cropped.png")
-DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "ugc_creators.json")
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import github_store
+
+ASSETS      = os.path.join(os.path.dirname(__file__), "..", "assets")
+LOGO_CROP   = os.path.join(ASSETS, "logo_cropped.png")
+DATA_FILE   = os.path.join(os.path.dirname(__file__), "..", "data", "ugc_creators.json")
+GITHUB_PATH = "data/ugc_creators.json"
 
 BG      = "#0a1628"
 SURFACE = "#0e1f3c"
@@ -104,15 +109,32 @@ st.markdown(f"""
 COLUMNS = ["id", "name", "platform", "handle", "contact", "status", "date_reached_out", "content_url", "notes"]
 
 def load_creators():
+    if github_store.available():
+        data, sha = github_store.load_json(GITHUB_PATH, {"creators": []})
+        st.session_state["_ugc_sha"] = sha
+        return data.get("creators", [])
     if not os.path.exists(DATA_FILE):
         return []
     with open(DATA_FILE) as f:
         return json.load(f).get("creators", [])
 
 def save_creators(records):
+    if github_store.available():
+        new_sha = github_store.save_json(
+            GITHUB_PATH, {"creators": records},
+            st.session_state.get("_ugc_sha"),
+            "Update UGC creator roster",
+        )
+        st.session_state["_ugc_sha"] = new_sha
+        return
     os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
     with open(DATA_FILE, "w") as f:
         json.dump({"creators": records}, f, indent=2, default=str)
+
+if github_store.available():
+    st.caption("Synced to GitHub — changes are saved permanently.")
+else:
+    st.warning("GITHUB_TOKEN secret not set — changes are only saved to this session's local disk and will be lost on restart. See github_store.py for setup.", icon="⚠️")
 
 creators = load_creators()
 
@@ -192,8 +214,11 @@ for r in records:
         r["date_reached_out"] = str(r["date_reached_out"])[:10]
 
 if records != creators:
-    save_creators(records)
-    st.rerun()
+    try:
+        save_creators(records)
+        st.rerun()
+    except Exception as e:
+        st.error(f"Couldn't save changes to GitHub: {e}")
 
 st.markdown(f"""
 <div style="font-size:0.72rem;color:{T3};margin-top:1rem;padding-top:1.2rem;border-top:1px solid {BORDER};line-height:1.6;">

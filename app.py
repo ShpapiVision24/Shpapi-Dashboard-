@@ -4,6 +4,8 @@ import os
 from datetime import timedelta, date
 from PIL import Image
 import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 
 try:
     from fpdf import FPDF
@@ -167,6 +169,17 @@ div[data-testid="stPageNavContainer"], nav[data-testid="stSidebarNav"] {{ displa
     line-height: 1.5;
 }}
 .section::after {{ content: ''; flex: 1; height: 1px; background: {BORDER}; }}
+.surface {{ background: {SURFACE}; border: 1px solid {BORDER}; border-radius: 12px; padding: 1.4rem 1.4rem 0.6rem; margin-bottom: 1rem; }}
+.chart-footnote {{ font-size: 0.68rem; color: {T3}; margin: -0.4rem 0 1rem 0; line-height: 1.5; }}
+button[data-baseweb="tab"] {{
+    background: transparent !important;
+    color: {T3} !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{ color: {BLUE} !important; }}
+div[data-baseweb="tab-highlight"] {{ background-color: {BLUE} !important; }}
+div[data-baseweb="tab-border"] {{ background-color: {BORDER} !important; }}
 div[data-testid="stPageLink"] {{
     border: none !important; background: none !important; box-shadow: none !important;
     padding: 0 !important; margin: 0 !important; padding-top: 1rem !important;
@@ -303,22 +316,27 @@ def get_shopify_summary():
         return None
 
 @st.cache_data(ttl=1800)
+def get_all_orders_full():
+    all_orders = []
+    url = f"{SHOP_URL}/admin/api/2024-01/orders.json"
+    params = {"status": "any", "limit": 250,
+              "fields": "id,created_at,total_price,financial_status,line_items,customer"}
+    while url:
+        r = requests.get(url, headers=SHOPIFY_HEADERS, params=params, timeout=15)
+        data = r.json()
+        all_orders.extend(data.get("orders", []))
+        next_url = None
+        for part in r.headers.get("Link", "").split(","):
+            if 'rel="next"' in part:
+                next_url = part.split(";")[0].strip().strip("<>")
+        url, params = next_url, None
+    return all_orders
+
+@st.cache_data(ttl=1800)
 def get_business_insights():
     try:
         import datetime as dt
-        all_orders = []
-        url = f"{SHOP_URL}/admin/api/2024-01/orders.json"
-        params = {"status": "any", "limit": 250,
-                  "fields": "id,created_at,total_price,financial_status,line_items,customer"}
-        while url:
-            r = requests.get(url, headers=SHOPIFY_HEADERS, params=params, timeout=15)
-            data = r.json()
-            all_orders.extend(data.get("orders", []))
-            next_url = None
-            for part in r.headers.get("Link", "").split(","):
-                if 'rel="next"' in part:
-                    next_url = part.split(";")[0].strip().strip("<>")
-            url, params = next_url, None
+        all_orders = get_all_orders_full()
 
         now = dt.datetime.now(dt.timezone.utc)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -362,6 +380,113 @@ def get_business_insights():
             "repeat_rate": repeat_rate,
             "unique_customers": unique_customers,
         }
+    except Exception:
+        return None
+
+@st.cache_data(ttl=1800)
+def get_shopify_growth_monthly():
+    """All-time monthly orders, revenue, and new-vs-repeat customers."""
+    try:
+        all_orders = get_all_orders_full()
+        if not all_orders:
+            return None
+
+        rows = []
+        for o in all_orders:
+            cust = o.get("customer")
+            rows.append({
+                "date": pd.to_datetime(o["created_at"]).tz_localize(None),
+                "revenue": float(o["total_price"]) if o.get("financial_status") in ("paid", "partially_refunded") else 0.0,
+                "customer_id": cust["id"] if cust else None,
+            })
+        df = pd.DataFrame(rows)
+        df["month"] = df["date"].dt.to_period("M")
+
+        monthly = df.groupby("month").agg(orders=("date", "size"), revenue=("revenue", "sum")).reset_index()
+
+        wc = df.dropna(subset=["customer_id"]).copy()
+        if wc.empty:
+            monthly["new_customers"] = 0
+            monthly["repeat_customers"] = 0
+        else:
+            first_month = wc.groupby("customer_id")["month"].min()
+            wc["first_month"] = wc["customer_id"].map(first_month)
+            wc["segment"] = np.where(wc["month"] == wc["first_month"], "new", "repeat")
+            cust_monthly = (wc.groupby(["month", "segment"])["customer_id"]
+                              .nunique().unstack(fill_value=0)
+                              .reindex(columns=["new", "repeat"], fill_value=0)
+                              .rename(columns={"new": "new_customers", "repeat": "repeat_customers"})
+                              .reset_index())
+            monthly = monthly.merge(cust_monthly, on="month", how="left").fillna(0)
+        monthly = monthly.sort_values("month")
+        monthly["month_str"] = monthly["month"].astype(str)
+        return monthly
+    except Exception:
+        return None
+
+@st.cache_data(ttl=3600)
+def get_ad_growth_monthly(account_id, token):
+    """All-time monthly spend/impressions/reach/clicks for a Meta ad account (Ads or Instagram)."""
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v19.0/{account_id}/insights",
+            params={"fields": "spend,impressions,reach,actions",
+                    "date_preset": "maximum", "level": "account",
+                    "time_increment": "monthly", "access_token": token},
+            timeout=20,
+        )
+        rows = r.json().get("data", [])
+        out = []
+        for d in rows:
+            clicks = 0
+            for a in d.get("actions", []):
+                if a.get("action_type") == "link_click":
+                    clicks += int(float(a["value"]))
+            out.append({
+                "month_str": d["date_start"][:7],
+                "spend": float(d.get("spend", 0)),
+                "impressions": int(d.get("impressions", 0)),
+                "reach": int(d.get("reach", 0)),
+                "clicks": clicks,
+            })
+        return pd.DataFrame(out) if out else None
+    except Exception:
+        return None
+
+@st.cache_data(ttl=3600)
+def get_google_growth_monthly():
+    """All-time monthly spend/impressions/clicks for Google Ads."""
+    try:
+        from google.ads.googleads.client import GoogleAdsClient
+        cfg = st.secrets["google_ads"]
+        config = {
+            "developer_token": cfg["developer_token"],
+            "client_id": cfg["client_id"],
+            "client_secret": cfg["client_secret"],
+            "refresh_token": cfg["refresh_token"],
+            "login_customer_id": cfg["client_customer_id"].replace("-", ""),
+            "use_proto_plus": True,
+        }
+        client = GoogleAdsClient.load_from_dict(config)
+        ga_service = client.get_service("GoogleAdsService")
+        customer_id = cfg["client_customer_id"].replace("-", "")
+        query = """
+            SELECT segments.date, metrics.impressions, metrics.clicks, metrics.cost_micros
+            FROM campaign
+            WHERE segments.date BETWEEN '2020-01-01' AND '2099-12-31'
+              AND campaign.status != 'REMOVED'
+        """
+        response = ga_service.search(customer_id=customer_id, query=query)
+        rows = [{"date": row.segments.date,
+                 "spend": row.metrics.cost_micros / 1_000_000,
+                 "impressions": row.metrics.impressions,
+                 "clicks": row.metrics.clicks} for row in response]
+        if not rows:
+            return None
+        df = pd.DataFrame(rows)
+        df["month_str"] = pd.to_datetime(df["date"]).dt.to_period("M").astype(str)
+        return df.groupby("month_str", as_index=False).agg(
+            spend=("spend", "sum"), impressions=("impressions", "sum"), clicks=("clicks", "sum"))
     except Exception:
         return None
 
@@ -424,6 +549,13 @@ with st.spinner("Loading overview..."):
     google    = get_google_ads_summary()
     insights  = get_business_insights()
 
+with st.spinner("Loading growth history..."):
+    IG_AD_ACCOUNT_ID   = "act_8429913163714900"
+    growth_shopify     = get_shopify_growth_monthly()
+    growth_meta        = get_ad_growth_monthly(AD_ACCOUNT_ID, ACCESS_TOKEN)
+    growth_instagram   = get_ad_growth_monthly(IG_AD_ACCOUNT_ID, ACCESS_TOKEN)
+    growth_google      = get_google_growth_monthly()
+
 # ── Business Insights ──────────────────────────────────────────────────────────
 st.markdown('<div class="section">Business Insights</div>', unsafe_allow_html=True)
 
@@ -461,6 +593,128 @@ if insights:
     """, unsafe_allow_html=True)
 else:
     st.markdown(f'<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;padding:1.5rem;text-align:center;color:{T3};font-size:0.85rem;">Business insights unavailable — could not load Shopify order data.</div>', unsafe_allow_html=True)
+
+# ── Growth Over Time ────────────────────────────────────────────────────────────
+st.markdown('<div class="section">Growth Over Time</div>', unsafe_allow_html=True)
+
+def _rgba(hex_color, alpha):
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+def _axis_layout(height, showlegend=False):
+    return dict(
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=T2, family="Inter"),
+        xaxis=dict(gridcolor="rgba(255,255,255,0.06)", zeroline=False, tickfont=dict(size=10, color=T2)),
+        yaxis=dict(gridcolor="rgba(255,255,255,0.06)", zeroline=False, tickfont=dict(size=10, color=T2)),
+        margin=dict(l=0, r=0, t=10, b=0), height=height, showlegend=showlegend,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(color=T2, size=10)),
+    )
+
+def _monthly_line_chart(x, y, color, prefix="", height=260):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=x, y=y, mode="lines+markers",
+        line=dict(color=color, width=2), marker=dict(color=color, size=5),
+        fill="tozeroy", fillcolor=_rgba(color, 0.12),
+        hovertemplate="<b>%{x}</b><br>%{y:,.2f}<extra></extra>",
+    ))
+    layout = _axis_layout(height)
+    layout["yaxis"]["tickprefix"] = prefix
+    fig.update_layout(**layout)
+    st.plotly_chart(fig, use_container_width=True)
+
+def _multi_line_chart(long_df, metric, color_map, prefix="", height=280):
+    fig, plotted = go.Figure(), False
+    for platform, sub in long_df.groupby("platform"):
+        sub = sub.sort_values("month_str")
+        if metric not in sub.columns or sub[metric].fillna(0).sum() == 0:
+            continue
+        fig.add_trace(go.Scatter(
+            x=sub["month_str"], y=sub[metric], mode="lines+markers", name=platform,
+            line=dict(width=2, color=color_map.get(platform)),
+        ))
+        plotted = True
+    if not plotted:
+        st.markdown(f'<div style="text-align:center;padding:2rem;color:{T3};">No data available.</div>', unsafe_allow_html=True)
+        return
+    layout = _axis_layout(height, showlegend=True)
+    layout["yaxis"]["tickprefix"] = prefix
+    fig.update_layout(**layout)
+    st.plotly_chart(fig, use_container_width=True)
+
+_ad_parts = []
+for _df, _label in [(growth_meta, "Meta Ads"), (growth_instagram, "Instagram"), (growth_google, "Google Ads")]:
+    if _df is not None and not _df.empty:
+        _d = _df.copy()
+        _d["platform"] = _label
+        _ad_parts.append(_d)
+ad_long   = pd.concat(_ad_parts, ignore_index=True) if _ad_parts else None
+AD_COLORS = {"Meta Ads": "#3b82f6", "Instagram": "#ec4899", "Google Ads": "#8b5cf6"}
+
+tab_rev, tab_cust, tab_ads, tab_brand = st.tabs(["Orders & Revenue", "Customers", "Ad Traction", "Brand Recognition"])
+
+with tab_rev:
+    st.markdown('<div class="surface">', unsafe_allow_html=True)
+    if growth_shopify is not None and not growth_shopify.empty:
+        st.markdown('<div class="platform-metric-label">Monthly Revenue — All Time Since Launch</div>', unsafe_allow_html=True)
+        _monthly_line_chart(growth_shopify["month_str"], growth_shopify["revenue"], "#22c55e", prefix="$")
+        st.markdown('<div class="platform-metric-label" style="margin-top:1rem;">Monthly Orders — All Time Since Launch</div>', unsafe_allow_html=True)
+        fig_o = go.Figure(go.Bar(x=growth_shopify["month_str"], y=growth_shopify["orders"],
+                                  marker=dict(color="#22c55e", opacity=0.85),
+                                  hovertemplate="<b>%{x}</b><br>Orders: %{y}<extra></extra>"))
+        fig_o.update_layout(**_axis_layout(220))
+        st.plotly_chart(fig_o, use_container_width=True)
+    else:
+        st.markdown(f'<div style="text-align:center;padding:2rem;color:{T3};">No order history available.</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with tab_cust:
+    st.markdown('<div class="surface">', unsafe_allow_html=True)
+    if growth_shopify is not None and not growth_shopify.empty:
+        st.markdown('<div class="platform-metric-label">New vs. Repeat Customers — All Time Since Launch</div>', unsafe_allow_html=True)
+        fig_c = go.Figure()
+        fig_c.add_trace(go.Bar(x=growth_shopify["month_str"], y=growth_shopify["new_customers"],
+                                name="New", marker=dict(color="#3b82f6")))
+        fig_c.add_trace(go.Bar(x=growth_shopify["month_str"], y=growth_shopify["repeat_customers"],
+                                name="Repeat", marker=dict(color="#22c55e")))
+        layout = _axis_layout(280, showlegend=True)
+        layout["barmode"] = "stack"
+        fig_c.update_layout(**layout)
+        st.plotly_chart(fig_c, use_container_width=True)
+    else:
+        st.markdown(f'<div style="text-align:center;padding:2rem;color:{T3};">No customer history available.</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with tab_ads:
+    st.markdown('<div class="surface">', unsafe_allow_html=True)
+    if ad_long is not None:
+        st.markdown('<div class="platform-metric-label">Monthly Ad Spend by Platform — All Time Since Launch</div>', unsafe_allow_html=True)
+        _multi_line_chart(ad_long, "spend", AD_COLORS, prefix="$")
+        st.markdown('<div class="platform-metric-label" style="margin-top:1rem;">Monthly Impressions by Platform — All Time Since Launch</div>', unsafe_allow_html=True)
+        _multi_line_chart(ad_long, "impressions", AD_COLORS)
+    else:
+        st.markdown(f'<div style="text-align:center;padding:2rem;color:{T3};">No ad history available.</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with tab_brand:
+    st.markdown('<div class="surface">', unsafe_allow_html=True)
+    if ad_long is not None:
+        st.markdown('<div class="platform-metric-label">Monthly Reach by Platform — All Time Since Launch</div>', unsafe_allow_html=True)
+        _multi_line_chart(ad_long, "reach", AD_COLORS)
+        st.markdown(f"""
+        <div class="chart-footnote">
+          Reach here is paid reach from Meta &amp; Instagram ads — unique people your brand has been shown to.
+          Organic follower/account growth isn't tracked yet because only the ad account is connected, not the
+          Instagram Business Account — connecting it would let us chart true follower growth over time.
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div style="text-align:center;padding:2rem;color:{T3};">No reach history available.</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 
 # ── AI Growth Analyst (inline, above platform cards) ──────────────────────────
 st.markdown('<div class="section">AI Growth Analyst</div>', unsafe_allow_html=True)

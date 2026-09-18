@@ -132,6 +132,7 @@ def fetch_google_ads_data(start_str, end_str):
                 campaign.status,
                 campaign.advertising_channel_type,
                 campaign.bidding_strategy_type,
+                campaign.start_date,
                 metrics.impressions,
                 metrics.clicks,
                 metrics.cost_micros,
@@ -180,6 +181,7 @@ def fetch_google_ads_data(start_str, end_str):
                 "Bid Strategy":  _BID.get(bid_raw, bid_raw.replace("_", " ").title()),
                 "Status":        row.campaign.status.name,
                 "Date":          row.segments.date,
+                "Date Added":    row.campaign.start_date,
                 "Impressions":   row.metrics.impressions,
                 "Clicks":        clicks,
                 "Cost":          cost,
@@ -316,7 +318,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ── Campaign breakdown ────────────────────────────────────────────────────────
 st.markdown('<div class="section">Campaign Breakdown</div>', unsafe_allow_html=True)
-camp = (df.groupby(["Campaign", "Type", "Bid Strategy", "Status"])
+camp = (df.groupby(["Campaign", "Type", "Bid Strategy", "Status", "Date Added"])
           .agg(
               Impressions  = ("Impressions",  "sum"),
               Clicks       = ("Clicks",       "sum"),
@@ -325,7 +327,7 @@ camp = (df.groupby(["Campaign", "Type", "Bid Strategy", "Status"])
               Conv_Value   = ("Conv. Value",  "sum"),
           )
           .reset_index()
-          .sort_values("Cost", ascending=False))
+          .sort_values("Date Added", ascending=False))
 
 camp["CTR"]         = (camp["Clicks"] / camp["Impressions"] * 100).fillna(0)
 camp["Avg CPC"]     = (camp["Cost"] / camp["Clicks"]).fillna(0)
@@ -334,6 +336,7 @@ camp["Cost/Conv."]  = (camp["Cost"] / camp["Conversions"]).replace([float("inf")
 camp["ROAS"]        = (camp["Conv_Value"] / camp["Cost"]).replace([float("inf")], 0).fillna(0)
 
 # Format for display
+camp["Date Added"]  = pd.to_datetime(camp["Date Added"]).dt.strftime("%b %d, %Y")
 camp["Impressions"] = camp["Impressions"].map("{:,}".format)
 camp["Clicks"]      = camp["Clicks"].map("{:,}".format)
 camp["Cost"]        = camp["Cost"].map("${:,.2f}".format)
@@ -345,7 +348,27 @@ camp["Conv. Rate"]  = camp["Conv. Rate"].map("{:.2f}%".format)
 camp["Cost/Conv."]  = camp["Cost/Conv."].map("${:,.2f}".format)
 camp["ROAS"]        = camp["ROAS"].map("{:.2f}x".format)
 
-display_cols = ["Campaign", "Type", "Bid Strategy", "Status",
+display_cols = ["Campaign", "Date Added", "Type", "Bid Strategy", "Status",
                 "Impressions", "Clicks", "CTR", "Avg CPC", "Cost",
                 "Conversions", "Conv. Rate", "Conv. Value", "Cost/Conv.", "ROAS"]
-st.dataframe(camp[display_cols], use_container_width=True, hide_index=True)
+
+column_help = {
+    "Campaign":     "The name of this ad campaign.",
+    "Date Added":   "The date this campaign was created and started running in Google Ads. Newest campaigns are listed first.",
+    "Type":         "The kind of campaign, e.g. Search (text ads on Google search results), Shopping, Display, Video, or Performance Max (Google's automated cross-channel campaign type).",
+    "Bid Strategy": "How Google decides what to bid on your behalf, e.g. Max Conv. Value (spend the budget to get the most conversion value) or Target CPA (aim for a set cost per conversion).",
+    "Status":       "Whether the campaign is currently Enabled or Paused.",
+    "Impressions":  "The number of times your ads were shown to people.",
+    "Clicks":       "The number of times someone clicked on your ad.",
+    "CTR":          "Click-Through Rate: the percentage of people who saw your ad and clicked it (Clicks ÷ Impressions). Higher means your ad is more relevant/appealing.",
+    "Avg CPC":      "Average Cost Per Click: the average amount you paid each time someone clicked your ad.",
+    "Cost":         "The total amount spent on this campaign over the selected date range.",
+    "Conversions":  "The number of desired actions (e.g. purchases, sign-ups) tracked from this campaign.",
+    "Conv. Rate":   "Conversion Rate: the percentage of clicks that turned into a conversion (Conversions ÷ Clicks).",
+    "Conv. Value":  "Conversion Value: the total dollar value of all conversions this campaign generated.",
+    "Cost/Conv.":   "Cost Per Conversion: how much you spent, on average, for each conversion (Cost ÷ Conversions).",
+    "ROAS":         "Return On Ad Spend: how many dollars of conversion value you got back for every dollar spent (Conv. Value ÷ Cost). Above 1x means the campaign generated more value than it cost.",
+}
+column_config = {col: st.column_config.Column(help=text) for col, text in column_help.items()}
+
+st.dataframe(camp[display_cols], use_container_width=True, hide_index=True, column_config=column_config)

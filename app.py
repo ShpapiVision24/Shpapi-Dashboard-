@@ -547,11 +547,17 @@ def get_instagram_summary():
     except:
         return None
 
-def _last_active_date(account_id):
-    """Most recent date this ad account had any impressions."""
+def _last_active_campaign(account_id):
+    """Most recent date+campaign this ad account actually delivered impressions on.
+
+    Meta's campaign-level effective_status is not a reliable "is this really
+    running" signal for this account — campaigns tend to stay ACTIVE even after
+    their ad sets are turned off or deleted. Real delivery is the only trustworthy
+    signal, so we look at the most recent day with impressions instead.
+    """
     try:
         rows, url = [], f"https://graph.facebook.com/v19.0/{account_id}/insights"
-        params = {"fields": "impressions", "level": "account", "date_preset": "maximum",
+        params = {"fields": "campaign_name,impressions", "level": "campaign", "date_preset": "maximum",
                    "time_increment": 1, "access_token": ACCESS_TOKEN, "limit": 500}
         while url:
             r = requests.get(url, params=params, timeout=15)
@@ -559,10 +565,13 @@ def _last_active_date(account_id):
             rows.extend(data.get("data", []))
             url    = data.get("paging", {}).get("next")
             params = {}
-        active_dates = [d["date_start"] for d in rows if int(d.get("impressions", 0)) > 0]
-        return max(active_dates) if active_dates else None
+        active_rows = [d for d in rows if int(d.get("impressions", 0)) > 0]
+        if not active_rows:
+            return None, None
+        latest = max(active_rows, key=lambda d: d["date_start"])
+        return latest["date_start"], latest.get("campaign_name")
     except Exception:
-        return None
+        return None, None
 
 def _days_since(date_str):
     if not date_str:
@@ -572,44 +581,26 @@ def _days_since(date_str):
 @st.cache_data(ttl=300)
 def get_meta_live_status():
     try:
-        r = requests.get(
-            f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/campaigns",
-            params={"fields": "id,name,effective_status,updated_time",
-                    "limit": 500, "access_token": ACCESS_TOKEN},
-            timeout=15,
-        )
-        camps = r.json().get("data", [])
-        if not camps:
+        last_date, campaign_name = _last_active_campaign(AD_ACCOUNT_ID)
+        if last_date is None:
             return None
-        active = [c for c in camps if c.get("effective_status") == "ACTIVE"]
-        pool    = active if active else camps
-        current = max(pool, key=lambda c: c.get("updated_time", ""))
-        if active:
-            return {"status": "live", "campaign_name": current.get("name"), "days_since": 0}
-        return {"status": "paused", "campaign_name": current.get("name"),
-                "days_since": _days_since(_last_active_date(AD_ACCOUNT_ID))}
+        days = _days_since(last_date)
+        if days is not None and days <= 1:
+            return {"status": "live", "campaign_name": campaign_name, "days_since": 0}
+        return {"status": "paused", "campaign_name": campaign_name, "days_since": days}
     except Exception:
         return None
 
 @st.cache_data(ttl=300)
 def get_instagram_live_status():
     try:
-        r = requests.get(
-            f"https://graph.facebook.com/v19.0/{IG_AD_ACCOUNT_ID}/campaigns",
-            params={"fields": "id,name,effective_status,updated_time",
-                    "limit": 500, "access_token": ACCESS_TOKEN},
-            timeout=15,
-        )
-        camps = r.json().get("data", [])
-        if not camps:
+        last_date, campaign_name = _last_active_campaign(IG_AD_ACCOUNT_ID)
+        if last_date is None:
             return None
-        active = [c for c in camps if c.get("effective_status") == "ACTIVE"]
-        pool    = active if active else camps
-        current = max(pool, key=lambda c: c.get("updated_time", ""))
-        if active:
-            return {"status": "live", "campaign_name": current.get("name"), "days_since": 0}
-        return {"status": "paused", "campaign_name": current.get("name"),
-                "days_since": _days_since(_last_active_date(IG_AD_ACCOUNT_ID))}
+        days = _days_since(last_date)
+        if days is not None and days <= 1:
+            return {"status": "live", "campaign_name": campaign_name, "days_since": 0}
+        return {"status": "paused", "campaign_name": campaign_name, "days_since": days}
     except Exception:
         return None
 

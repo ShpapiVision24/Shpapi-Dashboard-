@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import os
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime
 from PIL import Image
 import numpy as np
 import pandas as pd
@@ -46,11 +46,12 @@ T2      = "rgba(255,255,255,0.65)"
 T3      = "rgba(255,255,255,0.38)"
 BLUE    = "#3b82f6"
 
-ACCESS_TOKEN     = st.secrets["META_ACCESS_TOKEN"]
-AD_ACCOUNT_ID    = st.secrets["AD_ACCOUNT_ID"]
-SHOPIFY_TOKEN    = st.secrets["SHOPIFY_TOKEN"]
-SHOP_URL         = st.secrets["SHOP_URL"]
-SHOPIFY_HEADERS  = {"X-Shopify-Access-Token": SHOPIFY_TOKEN}
+ACCESS_TOKEN      = st.secrets["META_ACCESS_TOKEN"]
+AD_ACCOUNT_ID     = st.secrets["AD_ACCOUNT_ID"]
+IG_AD_ACCOUNT_ID  = "act_8429913163714900"
+SHOPIFY_TOKEN     = st.secrets["SHOPIFY_TOKEN"]
+SHOP_URL          = st.secrets["SHOP_URL"]
+SHOPIFY_HEADERS   = {"X-Shopify-Access-Token": SHOPIFY_TOKEN}
 
 st.set_page_config(page_title="Shpapi · Home", layout="wide", initial_sidebar_state="collapsed")
 
@@ -531,15 +532,132 @@ def get_google_ads_summary():
 def get_instagram_summary():
     try:
         r = requests.get(
-            "https://graph.facebook.com/v19.0/act_8429913163714900/insights",
-            params={"fields": "spend,reach,impressions", "level": "account",
+            f"https://graph.facebook.com/v19.0/{IG_AD_ACCOUNT_ID}/insights",
+            params={"fields": "spend,reach,impressions,actions", "level": "account",
                     "date_preset": "maximum", "access_token": ACCESS_TOKEN},
             timeout=15,
         )
         d = r.json().get("data", [{}])[0]
+        clicks = 0
+        for a in d.get("actions", []):
+            if a.get("action_type") == "link_click":
+                clicks = int(float(a["value"]))
         return {"spend": float(d.get("spend", 0)), "reach": int(d.get("reach", 0)),
-                "impressions": int(d.get("impressions", 0))}
+                "impressions": int(d.get("impressions", 0)), "clicks": clicks}
     except:
+        return None
+
+def _last_active_date(account_id):
+    """Most recent date this ad account had any impressions."""
+    try:
+        rows, url = [], f"https://graph.facebook.com/v19.0/{account_id}/insights"
+        params = {"fields": "impressions", "level": "account", "date_preset": "maximum",
+                   "time_increment": 1, "access_token": ACCESS_TOKEN, "limit": 500}
+        while url:
+            r = requests.get(url, params=params, timeout=15)
+            data = r.json()
+            rows.extend(data.get("data", []))
+            url    = data.get("paging", {}).get("next")
+            params = {}
+        active_dates = [d["date_start"] for d in rows if int(d.get("impressions", 0)) > 0]
+        return max(active_dates) if active_dates else None
+    except Exception:
+        return None
+
+def _days_since(date_str):
+    if not date_str:
+        return None
+    return (date.today() - datetime.strptime(date_str, "%Y-%m-%d").date()).days
+
+@st.cache_data(ttl=300)
+def get_meta_live_status():
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/campaigns",
+            params={"fields": "id,name,effective_status,updated_time",
+                    "limit": 500, "access_token": ACCESS_TOKEN},
+            timeout=15,
+        )
+        camps = r.json().get("data", [])
+        if not camps:
+            return None
+        active = [c for c in camps if c.get("effective_status") == "ACTIVE"]
+        pool    = active if active else camps
+        current = max(pool, key=lambda c: c.get("updated_time", ""))
+        if active:
+            return {"status": "live", "campaign_name": current.get("name"), "days_since": 0}
+        return {"status": "paused", "campaign_name": current.get("name"),
+                "days_since": _days_since(_last_active_date(AD_ACCOUNT_ID))}
+    except Exception:
+        return None
+
+@st.cache_data(ttl=300)
+def get_instagram_live_status():
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v19.0/{IG_AD_ACCOUNT_ID}/campaigns",
+            params={"fields": "id,name,effective_status,updated_time",
+                    "limit": 500, "access_token": ACCESS_TOKEN},
+            timeout=15,
+        )
+        camps = r.json().get("data", [])
+        if not camps:
+            return None
+        active = [c for c in camps if c.get("effective_status") == "ACTIVE"]
+        pool    = active if active else camps
+        current = max(pool, key=lambda c: c.get("updated_time", ""))
+        if active:
+            return {"status": "live", "campaign_name": current.get("name"), "days_since": 0}
+        return {"status": "paused", "campaign_name": current.get("name"),
+                "days_since": _days_since(_last_active_date(IG_AD_ACCOUNT_ID))}
+    except Exception:
+        return None
+
+@st.cache_data(ttl=300)
+def get_google_live_status():
+    try:
+        from google.ads.googleads.client import GoogleAdsClient
+        cfg = st.secrets["google_ads"]
+        config = {
+            "developer_token": cfg["developer_token"],
+            "client_id": cfg["client_id"],
+            "client_secret": cfg["client_secret"],
+            "refresh_token": cfg["refresh_token"],
+            "login_customer_id": cfg["client_customer_id"].replace("-", ""),
+            "use_proto_plus": True,
+        }
+        client = GoogleAdsClient.load_from_dict(config)
+        ga_service = client.get_service("GoogleAdsService")
+        customer_id = cfg["client_customer_id"].replace("-", "")
+        query = """
+            SELECT campaign.name, campaign.status, campaign.start_date_time
+            FROM campaign
+            WHERE campaign.status != 'REMOVED'
+        """
+        response = ga_service.search(customer_id=customer_id, query=query)
+        camps = [{"name": row.campaign.name, "status": row.campaign.status.name,
+                   "start": row.campaign.start_date_time} for row in response]
+        if not camps:
+            return None
+        active   = [c for c in camps if c["status"] == "ENABLED"]
+        pool     = active if active else camps
+        current  = max(pool, key=lambda c: c["start"])
+        if active:
+            return {"status": "live", "campaign_name": current["name"], "days_since": 0}
+
+        today_str = date.today().isoformat()
+        q2 = f"""
+            SELECT segments.date, metrics.impressions
+            FROM campaign
+            WHERE segments.date BETWEEN '2020-01-01' AND '{today_str}'
+              AND campaign.status != 'REMOVED'
+        """
+        resp2 = ga_service.search(customer_id=customer_id, query=q2)
+        active_dates = [row.segments.date for row in resp2 if row.metrics.impressions > 0]
+        last_active  = max(active_dates) if active_dates else None
+        return {"status": "paused", "campaign_name": current["name"],
+                "days_since": _days_since(last_active)}
+    except Exception:
         return None
 
 with st.spinner("Loading overview..."):
@@ -549,8 +667,78 @@ with st.spinner("Loading overview..."):
     google    = get_google_ads_summary()
     insights  = get_business_insights()
 
+with st.spinner("Loading live campaign status..."):
+    meta_live   = get_meta_live_status()
+    google_live = get_google_live_status()
+    ig_live     = get_instagram_live_status()
+
+def _ctr_str(summary):
+    if not summary or not summary.get("impressions"):
+        return "—"
+    return f"{(summary.get('clicks', 0) / summary['impressions'] * 100):.2f}%"
+
+def _live_row(label, color, summary, live, is_last):
+    live = live or {}
+    name = live.get("campaign_name") or "—"
+    ctr  = _ctr_str(summary)
+    if live.get("status") == "live":
+        status_html = (
+            '<span style="display:inline-flex;align-items:center;gap:0.45rem;">'
+            '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;'
+            'box-shadow:0 0 6px #22c55e;display:inline-block;"></span>'
+            '<span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:1px;color:#22c55e;">Live</span></span>'
+        )
+    elif live.get("status") == "paused" and live.get("days_since") is not None:
+        d = live["days_since"]
+        status_html = f'<span style="font-size:0.8rem;color:{T2};">{d} day{"s" if d != 1 else ""} since last ad</span>'
+    else:
+        status_html = f'<span style="font-size:0.8rem;color:{T3};">No data</span>'
+    border = f"border-bottom:1px solid {BORDER};" if not is_last else ""
+    return f"""
+    <tr style="{border}">
+      <td style="padding:1rem 1.4rem;">
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+          <span style="width:8px;height:8px;border-radius:50%;background:{color};display:inline-block;flex-shrink:0;"></span>
+          <div>
+            <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:{T3};">{label}</div>
+            <div style="font-size:0.85rem;font-weight:600;color:{T1};">{name}</div>
+          </div>
+        </div>
+      </td>
+      <td style="padding:1rem 1.4rem;font-size:0.95rem;font-weight:700;color:{T1};">{ctr}</td>
+      <td style="padding:1rem 1.4rem;">{status_html}</td>
+    </tr>"""
+
+_platform_rows = [
+    ("Meta Ads",   "#3b82f6", meta,      meta_live),
+    ("Google Ads", "#8b5cf6", google,    google_live),
+    ("Instagram",  "#ec4899", instagram, ig_live),
+]
+_rows_html = "".join(
+    _live_row(label, color, summary, live, i == len(_platform_rows) - 1)
+    for i, (label, color, summary, live) in enumerate(_platform_rows)
+)
+
+st.markdown('<div class="section">Live Campaigns</div>', unsafe_allow_html=True)
+st.markdown(f"""
+<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;overflow:hidden;margin-bottom:2rem;">
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="border-bottom:1px solid {BORDER};">
+        <th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Platform &amp; Current Campaign</th>
+        <th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">CTR &nbsp;·&nbsp; % of people who clicked your ad after seeing it</th>
+        <th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {_rows_html}
+    </tbody>
+  </table>
+</div>
+""", unsafe_allow_html=True)
+
 with st.spinner("Loading growth history..."):
-    IG_AD_ACCOUNT_ID   = "act_8429913163714900"
     growth_shopify     = get_shopify_growth_monthly()
     growth_meta        = get_ad_growth_monthly(AD_ACCOUNT_ID, ACCESS_TOKEN)
     growth_instagram   = get_ad_growth_monthly(IG_AD_ACCOUNT_ID, ACCESS_TOKEN)

@@ -695,20 +695,19 @@ def _live_row(label, color, summary, live, is_last):
     else:
         status_html = f'<span style="font-size:0.8rem;color:{T3};">No data</span>'
     border = f"border-bottom:1px solid {BORDER};" if not is_last else ""
-    return f"""
-    <tr style="{border}">
-      <td style="padding:1rem 1.4rem;">
-        <div style="display:flex;align-items:center;gap:0.65rem;">
-          <span style="width:8px;height:8px;border-radius:50%;background:{color};display:inline-block;flex-shrink:0;"></span>
-          <div>
-            <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:{T3};">{label}</div>
-            <div style="font-size:0.85rem;font-weight:600;color:{T1};">{name}</div>
-          </div>
-        </div>
-      </td>
-      <td style="padding:1rem 1.4rem;font-size:0.95rem;font-weight:700;color:{T1};">{ctr}</td>
-      <td style="padding:1rem 1.4rem;">{status_html}</td>
-    </tr>"""
+    return (
+        f'<tr style="{border}">'
+        f'<td style="padding:1rem 1.4rem;">'
+        f'<div style="display:flex;align-items:center;gap:0.65rem;">'
+        f'<span style="width:8px;height:8px;border-radius:50%;background:{color};display:inline-block;flex-shrink:0;"></span>'
+        f'<div>'
+        f'<div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:{T3};">{label}</div>'
+        f'<div style="font-size:0.85rem;font-weight:600;color:{T1};">{name}</div>'
+        f'</div></div></td>'
+        f'<td style="padding:1rem 1.4rem;font-size:0.95rem;font-weight:700;color:{T1};">{ctr}</td>'
+        f'<td style="padding:1rem 1.4rem;">{status_html}</td>'
+        f'</tr>'
+    )
 
 _platform_rows = [
     ("Meta Ads",   "#3b82f6", meta,      meta_live),
@@ -721,22 +720,19 @@ _rows_html = "".join(
 )
 
 st.markdown('<div class="section">Live Campaigns</div>', unsafe_allow_html=True)
-st.markdown(f"""
-<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;overflow:hidden;margin-bottom:2rem;">
-  <table style="width:100%;border-collapse:collapse;">
-    <thead>
-      <tr style="border-bottom:1px solid {BORDER};">
-        <th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Platform &amp; Current Campaign</th>
-        <th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">CTR &nbsp;·&nbsp; % of people who clicked your ad after seeing it</th>
-        <th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {_rows_html}
-    </tbody>
-  </table>
-</div>
-""", unsafe_allow_html=True)
+_live_table_html = (
+    f'<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;overflow:hidden;margin-bottom:2rem;">'
+    f'<table style="width:100%;border-collapse:collapse;">'
+    f'<thead><tr style="border-bottom:1px solid {BORDER};">'
+    f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Platform &amp; Current Campaign</th>'
+    f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">CTR &nbsp;·&nbsp; % of people who clicked your ad after seeing it</th>'
+    f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Status</th>'
+    f'</tr></thead>'
+    f'<tbody>{_rows_html}</tbody>'
+    f'</table>'
+    f'</div>'
+)
+st.markdown(_live_table_html, unsafe_allow_html=True)
 
 with st.spinner("Loading growth history..."):
     growth_shopify     = get_shopify_growth_monthly()

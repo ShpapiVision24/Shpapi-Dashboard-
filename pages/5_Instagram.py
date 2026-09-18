@@ -219,6 +219,19 @@ with st.spinner("Loading Instagram data..."):
     camp_meta  = fetch_campaign_details()
     thumbnails = fetch_thumbnails()
 
+# Brand-new active boosts with no delivery yet don't show up in insights data —
+# add them as zero-stat placeholders so a boost you just launched appears right away.
+if not api_error:
+    ids_with_data = {c.get("campaign_id") for c in campaigns}
+    for cid, meta in camp_meta.items():
+        if cid in ids_with_data or meta.get("effective_status") != "ACTIVE":
+            continue
+        campaigns.append({
+            "campaign_id": cid, "campaign_name": meta.get("name", "Unnamed boost"),
+            "spend": 0, "reach": 0, "impressions": 0, "clicks": 0,
+            "actions": [], "action_values": [], "video_play_actions": [],
+        })
+
 if api_error:
     st.error(f"Instagram API error: {api_error}")
 elif not campaigns:

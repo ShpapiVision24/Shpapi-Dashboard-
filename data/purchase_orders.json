@@ -1,51 +1,788 @@
 {
   "orders": [
     {
+      "id": "PO-2601-IV",
+      "name": "Collection IV",
+      "collection": "IV",
+      "supplier": "Shenzhen Sifier Technology Co., Ltd.",
+      "date": "2026-08-28",
+      "fees": {
+        "product_subtotal": 5334.4,
+        "logo_cost": 855,
+        "logo_cost_note": "Estimated: 8 acetate styles @ $75 + 4 metal styles @ $45, plus 1 sample-only style's $75 fee folded in here (PO 2601's logo fee ($1,320 total) isn't split by collection on the invoice \u2014 this is our attribution based on which styles belong to which collection).",
+        "shipping": 299.54,
+        "shipping_note": "DDP \u2014 apportioned by this collection's share of the PO's product subtotal (shipping is one flat $570 charge for the whole shipment, not split by collection on the invoice).",
+        "lens_fee": 417.14,
+        "lens_fee_note": "$1.9/pc lens change fee, apportioned by this collection's share of units that requested a lens change (polarized/mirror/blue-blocking/gradient) out of ~400pcs total on the invoice.",
+        "discount": -533.44,
+        "discount_note": "10% off, computed exactly on this collection's own product subtotal.",
+        "total": 6372.64
+      },
+      "items": [
+        {
+          "model": "9133",
+          "color": "C5 Blue/Orange",
+          "size": "",
+          "note": "Change lens to gradient orange",
+          "qty": 10,
+          "unit_cost": 15.9,
+          "amount": 159.0,
+          "style_name": "KNICKS IN 5"
+        },
+        {
+          "model": "SUN-9115-BL",
+          "color": "C4 Transparent/Orange",
+          "size": "",
+          "note": "Blue blocking lenses H9 (orange)",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "BLUE LIGHT BLOCKING BOOK CLUB"
+        },
+        {
+          "model": "SE-9270",
+          "color": "C1 Black/Gray",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "CABO WABO'S"
+        },
+        {
+          "model": "SE-9270",
+          "color": "C3 Green/Gradient Brown",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5,
+          "style_name": "THE SHANDY'S"
+        },
+        {
+          "model": "SE-9270",
+          "color": "C2",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5,
+          "style_name": "SHWIFEY'S"
+        },
+        {
+          "model": "ED-9292",
+          "color": "C1 Black/Gray",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 15,
+          "unit_cost": 21.9,
+          "amount": 328.5,
+          "style_name": "THE CANNI'S"
+        },
+        {
+          "model": "ED-9292",
+          "color": "C3 Green/Blue",
+          "size": "",
+          "note": "Change lens to gradient blue",
+          "qty": 10,
+          "unit_cost": 21.9,
+          "amount": 219.0,
+          "style_name": "THE SHTEDDY'S"
+        },
+        {
+          "model": "AIR-9154",
+          "color": "C4 Red/Gray",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 10,
+          "unit_cost": 20.9,
+          "amount": 209.0,
+          "style_name": "SH'NAGHUME"
+        },
+        {
+          "model": "AIR-9154",
+          "color": "C7 Dark Brown/Brown",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 10,
+          "unit_cost": 20.9,
+          "amount": 209.0,
+          "style_name": "P. CRUZ'S"
+        },
+        {
+          "model": "SUN-9238",
+          "color": "C1 Black/Grey",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 15,
+          "unit_cost": 20.9,
+          "amount": 313.5,
+          "style_name": "SHCOCO"
+        },
+        {
+          "model": "SUN-9238",
+          "color": "C3 Black/Purple",
+          "size": "",
+          "note": "No specific request",
+          "qty": 10,
+          "unit_cost": 20.9,
+          "amount": 209.0,
+          "style_name": "THE LIVERZZZ"
+        },
+        {
+          "model": "SUN-9238",
+          "color": "C5 Tortoise/Yellow",
+          "size": "",
+          "note": "No specific request",
+          "qty": 10,
+          "unit_cost": 20.9,
+          "amount": 209.0,
+          "style_name": "MS. KIM'S"
+        },
+        {
+          "model": "BOLD-7293",
+          "color": "C3 Brown/Brown",
+          "size": "",
+          "note": "Make lenses darker (not see through)",
+          "qty": 15,
+          "unit_cost": 16.9,
+          "amount": 253.5,
+          "style_name": "REX"
+        },
+        {
+          "model": "BO-7333",
+          "color": "C7 Gradient Brown",
+          "size": "",
+          "note": "No specific request",
+          "qty": 10,
+          "unit_cost": 22.9,
+          "amount": 229.0,
+          "style_name": "THE STEP MOM'S"
+        },
+        {
+          "model": "SE-9284",
+          "color": "C4 Gradient Brown/Green",
+          "size": "",
+          "note": "No specific request",
+          "qty": 7,
+          "unit_cost": 19.9,
+          "amount": 139.3,
+          "style_name": "JOUS"
+        },
+        {
+          "model": "SE-9284",
+          "color": "C2 Tortoise/Brown",
+          "size": "",
+          "note": "Make the lens polarized",
+          "qty": 19,
+          "unit_cost": 19.9,
+          "amount": 378.1,
+          "style_name": "SHMAC'S"
+        },
+        {
+          "model": "SK-3019",
+          "color": "C2 Grey",
+          "size": "",
+          "note": "Blue light blocking (Titanium)",
+          "qty": 10,
+          "unit_cost": 18.9,
+          "amount": 189.0,
+          "style_name": "DR. SHPA"
+        },
+        {
+          "model": "ED-9327",
+          "color": "C1 Black/Gray",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 10,
+          "unit_cost": 22.9,
+          "amount": 229.0,
+          "style_name": "IXTAPISH"
+        },
+        {
+          "model": "ED-9327",
+          "color": "C6 Brown/Blue",
+          "size": "",
+          "note": "Make lens gradient blue",
+          "qty": 10,
+          "unit_cost": 22.9,
+          "amount": 229.0,
+          "style_name": "FERVI'S"
+        },
+        {
+          "model": "BO-7316-T",
+          "color": "C1 Black/Black",
+          "size": "",
+          "note": "Make lens polarized (Titanium)",
+          "qty": 10,
+          "unit_cost": 23.9,
+          "amount": 239.0,
+          "style_name": "BEACHCRAFT"
+        },
+        {
+          "model": "MA-3239",
+          "color": "C1 Black/Grey",
+          "size": "",
+          "note": "Make lens polarized (Titanium)",
+          "qty": 10,
+          "unit_cost": 23.9,
+          "amount": 239.0,
+          "style_name": "THERENI'S"
+        },
+        {
+          "model": "MA-3238",
+          "color": "C7 Black Gradient Yellow",
+          "size": "",
+          "note": "Make lens polarized (Titanium)",
+          "qty": 15,
+          "unit_cost": 23.9,
+          "amount": 358.5,
+          "style_name": "LOS VILLARREAL"
+        }
+      ]
+    },
+    {
+      "id": "PO-2601-III",
+      "name": "Collection III \u2014 Restock",
+      "collection": "III",
+      "supplier": "Shenzhen Sifier Technology Co., Ltd.",
+      "date": "2026-08-28",
+      "fees": {
+        "product_subtotal": 4816.6,
+        "logo_cost": 465,
+        "logo_cost_note": "Estimated: 5 acetate styles @ $75 + 2 metal styles @ $45 (PO 2601's logo fee ($1,320 total) isn't split by collection on the invoice \u2014 this is our attribution based on which styles belong to which collection).",
+        "shipping": 270.46,
+        "shipping_note": "DDP \u2014 apportioned by this collection's share of the PO's product subtotal (shipping is one flat $570 charge for the whole shipment, not split by collection on the invoice).",
+        "lens_fee": 342.86,
+        "lens_fee_note": "$1.9/pc lens change fee, apportioned by this collection's share of units that requested a lens change (polarized/mirror/blue-blocking/gradient) out of ~400pcs total on the invoice.",
+        "discount": -481.66,
+        "discount_note": "10% off, computed exactly on this collection's own product subtotal.",
+        "total": 5413.26
+      },
+      "items": [
+        {
+          "model": "BA1-7133",
+          "color": "C1 Brown/Blue",
+          "size": "",
+          "note": "No specific request",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "MRS. SHMAMI"
+        },
+        {
+          "model": "BA1-7133",
+          "color": "C6 Dark Green",
+          "size": "",
+          "note": "Change to Dark Green lenses",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "THE DANI'S"
+        },
+        {
+          "model": "BA1-7133",
+          "color": "C3 Black/Grey",
+          "size": "",
+          "note": "Change to dark black lenses, polarized",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "SASSI'S"
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C1 Black/Grey",
+          "size": "",
+          "note": "Change to dark black lenses, polarized",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "SHPATRON"
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C4 Grey/Gradient Orange",
+          "size": "",
+          "note": "No specific request",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5,
+          "style_name": "SHUAVES"
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C5 Light Pink/Blue",
+          "size": "",
+          "note": "Change to gradient blue lenses, polarized",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "THE SHROMO'S"
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C9 Light Brown/Brown",
+          "size": "",
+          "note": "Make the lenses polarized",
+          "qty": 20,
+          "unit_cost": 19.9,
+          "amount": 398.0,
+          "style_name": "THE SHROWIZ"
+        },
+        {
+          "model": "AIR-9114",
+          "color": "C7 Brown/Yellow",
+          "size": "",
+          "note": "Change lens to gradient yellow",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "SHVICKY'S"
+        },
+        {
+          "model": "AIR-9114",
+          "color": "C3 Black/Pink",
+          "size": "",
+          "note": "No specific request",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "THE CARO'S"
+        },
+        {
+          "model": "AIR-9114",
+          "color": "C4 Green/Blue",
+          "size": "",
+          "note": "No specific request",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5,
+          "style_name": "THE MARY'S"
+        },
+        {
+          "model": "AIR-9114",
+          "color": "C5 Transparent/Green",
+          "size": "",
+          "note": "No specific request",
+          "qty": 5,
+          "unit_cost": 19.9,
+          "amount": 99.5,
+          "style_name": "THE SHLIMES"
+        },
+        {
+          "model": "SK-3185",
+          "color": "C2 Red/Gradient Red",
+          "size": "",
+          "note": "No specific request",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "LOCA ROJA"
+        },
+        {
+          "model": "SK-3185",
+          "color": "C1 Black/Grey",
+          "size": "",
+          "note": "Change to mirror lens, polarized",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0,
+          "style_name": "SHBADDIE"
+        },
+        {
+          "model": "9133",
+          "color": "C6 Brown Green",
+          "size": "",
+          "note": "Add polarized",
+          "qty": 10,
+          "unit_cost": 15.9,
+          "amount": 159.0,
+          "style_name": "LUSHANS"
+        },
+        {
+          "model": "9133",
+          "color": "\u2014",
+          "size": "",
+          "note": "Change to mirror lens, polarized",
+          "qty": 10,
+          "unit_cost": 15.9,
+          "amount": 159.0,
+          "style_name": "00 SHPA'S"
+        },
+        {
+          "model": "9133",
+          "color": "C2 GVP Tortoise/Purple",
+          "size": "",
+          "note": "Make lens gradient purple, polarized",
+          "qty": 10,
+          "unit_cost": 15.9,
+          "amount": 159.0,
+          "style_name": "EL VILLANO"
+        },
+        {
+          "model": "9133",
+          "color": "C3 GY Blue",
+          "size": "",
+          "note": "Change to yellow, add blue blocking lenses H7",
+          "qty": 10,
+          "unit_cost": 15.9,
+          "amount": 159.0,
+          "style_name": "GAVILANA"
+        },
+        {
+          "model": "9133",
+          "color": "C4 GBN Light Yellow/Red",
+          "size": "",
+          "note": "Make lens polarized",
+          "qty": 15,
+          "unit_cost": 15.9,
+          "amount": 238.5,
+          "style_name": "PUNTA MITS"
+        },
+        {
+          "model": "AIR-9057",
+          "color": "C4 Grey/Orange",
+          "size": "",
+          "note": "No specific request",
+          "qty": 15,
+          "unit_cost": 20.9,
+          "amount": 313.5,
+          "style_name": "LA CONSENTIDA"
+        },
+        {
+          "model": "AIR-9057",
+          "color": "C3 Light Pink/Gradient Green",
+          "size": "",
+          "note": "\u26a0 PENDING CONFIRMATION \u2014 supplier says this colorway (C3 Light Pink/Gradient Green) is out of stock and not selling well, and asked us to pick a different colorway before this ships. Original request: change lens to gradient green.",
+          "qty": 15,
+          "unit_cost": 20.9,
+          "amount": 313.5,
+          "style_name": "SHPATRONA"
+        },
+        {
+          "model": "9133",
+          "color": "C2 Tortoise/Purple",
+          "size": "",
+          "note": "Change to blue blocking lenses H3",
+          "qty": 5,
+          "unit_cost": 15.9,
+          "amount": 79.5,
+          "style_name": "AFTER HOURS (BLUE BLOCKING)"
+        },
+        {
+          "model": "DY-8108-A",
+          "color": "C5 Tortoise/Light Orange",
+          "size": "",
+          "note": "Change to blue blocking lenses H4",
+          "qty": 5,
+          "unit_cost": 19.9,
+          "amount": 99.5,
+          "style_name": "UESIDERS (BLUE BLOCKING)"
+        },
+        {
+          "model": "AIR-9107",
+          "color": "C1 Black",
+          "size": "",
+          "note": "Blue light blocking (Titanium)",
+          "qty": 5,
+          "unit_cost": 17.9,
+          "amount": 89.5,
+          "style_name": "JC'S"
+        },
+        {
+          "model": "AIR-9107",
+          "color": "C3 Silver",
+          "size": "",
+          "note": "Blue light blocking (Titanium)",
+          "qty": 5,
+          "unit_cost": 17.9,
+          "amount": 89.5,
+          "style_name": "STUDIO 24"
+        },
+        {
+          "model": "SK-3101",
+          "color": "C3 Silver",
+          "size": "",
+          "note": "No specific request (IP-Titanium)",
+          "qty": 4,
+          "unit_cost": 17.9,
+          "amount": 71.6,
+          "style_name": "STUDIO 24"
+        }
+      ]
+    },
+    {
       "id": "PO-2502",
-      "name": "Collection 111",
+      "name": "Collection III",
       "supplier": "Shenzhen Sifier Technology Co., Ltd.",
       "date": "2025-10-17",
       "items": [
-        {"model": "9133",       "color": "C1 LB", "size": "46-24-145", "note": "",                          "qty": 15, "unit_cost": 15.90, "amount": 238.50},
-        {"model": "9133",       "color": "C1 YW", "size": "46-24-145", "note": "",                          "qty": 20, "unit_cost": 15.90, "amount": 318.00},
-        {"model": "9133",       "color": "C3 GY", "size": "46-24-145", "note": "Change to mirror lens",     "qty": 15, "unit_cost": 15.90, "amount": 238.50},
-        {"model": "9133",       "color": "C4 GBN","size": "46-24-145", "note": "",                          "qty": 10, "unit_cost": 15.90, "amount": 159.00},
-        {"model": "9133",       "color": "C6",    "size": "46-24-145", "note": "Change gradient green lens","qty": 15, "unit_cost": 15.90, "amount": 238.50},
-        {"model": "AIR-9057",   "color": "C1",    "size": "52-20-145", "note": "",                          "qty": 15, "unit_cost": 20.90, "amount": 313.50},
-        {"model": "AIR-9057",   "color": "C4",    "size": "52-20-145", "note": "",                          "qty": 15, "unit_cost": 20.90, "amount": 313.50},
-        {"model": "DY-8108-A",  "color": "C5",    "size": "53-17-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "DY-8108-A",  "color": "C7",    "size": "53-17-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "AIR-9106",   "color": "C3",    "size": "49-19-145", "note": "Change to blue light lens", "qty": 10, "unit_cost": 17.90, "amount": 179.00},
-        {"model": "AIR-9114",   "color": "C3",    "size": "50-21-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "AIR-9114",   "color": "C4",    "size": "50-21-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "AIR-9114",   "color": "C5",    "size": "50-21-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "SUN-9115",   "color": "C2",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "SUN-9115",   "color": "C3",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "SUN-9115",   "color": "C4",    "size": "48-23-145", "note": "",                          "qty": 10, "unit_cost": 19.90, "amount": 199.00},
-        {"model": "SUN-9115",   "color": "C5",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "SUN-9115",   "color": "C7",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "SUN-9115",   "color": "C9",    "size": "48-23-145", "note": "",                          "qty": 15, "unit_cost": 19.90, "amount": 298.50},
-        {"model": "BAI-7133",   "color": "C1",    "size": "50-18-140", "note": "",                          "qty": 10, "unit_cost": 18.90, "amount": 189.00},
-        {"model": "BAI-7133",   "color": "C4",    "size": "50-18-140", "note": "",                          "qty": 15, "unit_cost": 18.90, "amount": 283.50},
-        {"model": "BAI-7133",   "color": "C5",    "size": "50-18-140", "note": "Already blue light lens",   "qty": 15, "unit_cost": 18.90, "amount": 283.50},
-        {"model": "BAI-7133",   "color": "C6",    "size": "50-18-140", "note": "",                          "qty": 10, "unit_cost": 18.90, "amount": 189.00},
-        {"model": "BSU-7128",   "color": "C2",    "size": "49-21-145", "note": "",                          "qty": 1,  "unit_cost": 22.90, "amount": 22.90},
-        {"model": "BEA1-7072",  "color": "C4",    "size": "46-23-145", "note": "",                          "qty": 10, "unit_cost": 13.90, "amount": 139.00},
-        {"model": "AIR-9107",   "color": "C1",    "size": "49-19-145", "note": "Change to mirror lens",     "qty": 5,  "unit_cost": 17.90, "amount": 89.50},
-        {"model": "AIR-9107",   "color": "C3",    "size": "49-19-145", "note": "Change to blue light lens", "qty": 10, "unit_cost": 17.90, "amount": 179.00},
-        {"model": "BEA1-7072",  "color": "C2",    "size": "46-23-145", "note": "Change to blue light lens", "qty": 10, "unit_cost": 13.90, "amount": 139.00}
+        {
+          "model": "9133",
+          "color": "C1 LB",
+          "size": "46-24-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 15.9,
+          "amount": 238.5
+        },
+        {
+          "model": "9133",
+          "color": "C1 YW",
+          "size": "46-24-145",
+          "note": "",
+          "qty": 20,
+          "unit_cost": 15.9,
+          "amount": 318.0
+        },
+        {
+          "model": "9133",
+          "color": "C3 GY",
+          "size": "46-24-145",
+          "note": "Change to mirror lens",
+          "qty": 15,
+          "unit_cost": 15.9,
+          "amount": 238.5
+        },
+        {
+          "model": "9133",
+          "color": "C4 GBN",
+          "size": "46-24-145",
+          "note": "",
+          "qty": 10,
+          "unit_cost": 15.9,
+          "amount": 159.0
+        },
+        {
+          "model": "9133",
+          "color": "C6",
+          "size": "46-24-145",
+          "note": "Change gradient green lens",
+          "qty": 15,
+          "unit_cost": 15.9,
+          "amount": 238.5
+        },
+        {
+          "model": "AIR-9057",
+          "color": "C1",
+          "size": "52-20-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 20.9,
+          "amount": 313.5
+        },
+        {
+          "model": "AIR-9057",
+          "color": "C4",
+          "size": "52-20-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 20.9,
+          "amount": 313.5
+        },
+        {
+          "model": "DY-8108-A",
+          "color": "C5",
+          "size": "53-17-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "DY-8108-A",
+          "color": "C7",
+          "size": "53-17-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "AIR-9106",
+          "color": "C3",
+          "size": "49-19-145",
+          "note": "Change to blue light lens",
+          "qty": 10,
+          "unit_cost": 17.9,
+          "amount": 179.0
+        },
+        {
+          "model": "AIR-9114",
+          "color": "C3",
+          "size": "50-21-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "AIR-9114",
+          "color": "C4",
+          "size": "50-21-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "AIR-9114",
+          "color": "C5",
+          "size": "50-21-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C2",
+          "size": "48-23-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C3",
+          "size": "48-23-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C4",
+          "size": "48-23-145",
+          "note": "",
+          "qty": 10,
+          "unit_cost": 19.9,
+          "amount": 199.0
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C5",
+          "size": "48-23-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C7",
+          "size": "48-23-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "SUN-9115",
+          "color": "C9",
+          "size": "48-23-145",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 19.9,
+          "amount": 298.5
+        },
+        {
+          "model": "BAI-7133",
+          "color": "C1",
+          "size": "50-18-140",
+          "note": "",
+          "qty": 10,
+          "unit_cost": 18.9,
+          "amount": 189.0
+        },
+        {
+          "model": "BAI-7133",
+          "color": "C4",
+          "size": "50-18-140",
+          "note": "",
+          "qty": 15,
+          "unit_cost": 18.9,
+          "amount": 283.5
+        },
+        {
+          "model": "BAI-7133",
+          "color": "C5",
+          "size": "50-18-140",
+          "note": "Already blue light lens",
+          "qty": 15,
+          "unit_cost": 18.9,
+          "amount": 283.5
+        },
+        {
+          "model": "BAI-7133",
+          "color": "C6",
+          "size": "50-18-140",
+          "note": "",
+          "qty": 10,
+          "unit_cost": 18.9,
+          "amount": 189.0
+        },
+        {
+          "model": "BSU-7128",
+          "color": "C2",
+          "size": "49-21-145",
+          "note": "",
+          "qty": 1,
+          "unit_cost": 22.9,
+          "amount": 22.9
+        },
+        {
+          "model": "BEA1-7072",
+          "color": "C4",
+          "size": "46-23-145",
+          "note": "",
+          "qty": 10,
+          "unit_cost": 13.9,
+          "amount": 139.0
+        },
+        {
+          "model": "AIR-9107",
+          "color": "C1",
+          "size": "49-19-145",
+          "note": "Change to mirror lens",
+          "qty": 5,
+          "unit_cost": 17.9,
+          "amount": 89.5
+        },
+        {
+          "model": "AIR-9107",
+          "color": "C3",
+          "size": "49-19-145",
+          "note": "Change to blue light lens",
+          "qty": 10,
+          "unit_cost": 17.9,
+          "amount": 179.0
+        },
+        {
+          "model": "BEA1-7072",
+          "color": "C2",
+          "size": "46-23-145",
+          "note": "Change to blue light lens",
+          "qty": 10,
+          "unit_cost": 13.9,
+          "amount": 139.0
+        }
       ],
       "fees": {
-        "product_subtotal": 6696.90,
-        "logo_cost": 375.00,
+        "product_subtotal": 6696.9,
+        "logo_cost": 375.0,
         "logo_cost_note": "9057, 8108, 9106, 7072, 9107 @ $75/style",
-        "shipping": 420.00,
+        "shipping": 420.0,
         "shipping_note": "DDP",
         "discount": -669.69,
-        "lens_fee": 223.50,
+        "lens_fee": 223.5,
         "lens_fee_note": "Mirror $6.5/pc, blue light $1.5/pc, gradient green $4.9/pc",
         "total": 7045.71
-      }
+      },
+      "collection": "III"
     }
   ]
 }

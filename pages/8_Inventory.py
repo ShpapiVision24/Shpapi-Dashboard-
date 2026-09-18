@@ -160,12 +160,21 @@ for o in orders:
     order_margin  = (order_profit / order_revenue * 100) if order_revenue else 0
     order_blended_cost = (fees["total"] / order_units) if order_units else 0
 
+    collection = o.get("collection")
+    badge_color = {"III": "#3b82f6", "IV": "#8b5cf6"}.get(collection)
+    badge_html = (
+        f'<span style="display:inline-block;padding:0.2rem 0.6rem;border-radius:20px;'
+        f'font-size:0.65rem;font-weight:700;letter-spacing:0.5px;margin-left:0.6rem;'
+        f'color:{badge_color};background:{badge_color}26;border:1px solid {badge_color}55;">'
+        f'COLLECTION {collection}</span>'
+    ) if collection else ""
+
     with st.container():
         st.markdown(f"""
-        <div class="surface">
+        <div class="surface" style="{f'border-left:3px solid {badge_color};' if badge_color else ''}">
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
             <div>
-              <div style="font-size:1.1rem;font-weight:700;color:{T1};">{o['name']}</div>
+              <div style="font-size:1.1rem;font-weight:700;color:{T1};">{o['name']}{badge_html}</div>
               <div style="font-size:0.72rem;color:{T3};margin-top:0.2rem;">{o['id']} &nbsp;·&nbsp; {o['supplier']} &nbsp;·&nbsp; {o['date']}</div>
             </div>
             <div style="font-size:0.75rem;color:{T2};text-align:right;">
@@ -208,6 +217,7 @@ for o in orders:
             margin = (profit / rev * 100) if rev else 0
             rows.append({
                 "Model": i["model"],
+                "Style Name": i.get("style_name", ""),
                 "Color": i["color"],
                 "Size": i["size"],
                 "Note": i["note"],

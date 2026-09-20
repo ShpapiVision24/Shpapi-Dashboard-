@@ -142,13 +142,52 @@ def fetch_campaign_details():
     r = requests.get(
         f"https://graph.facebook.com/v19.0/{IG_ACCOUNT}/campaigns",
         params={
-            "fields": "id,name,effective_status,daily_budget,lifetime_budget,start_time,end_time,stop_time",
+            "fields": "id,name,effective_status,daily_budget,lifetime_budget,start_time,end_time,stop_time,created_time",
             "limit": 200,
             "access_token": ACCESS_TOKEN,
         },
         timeout=15,
     )
     return {c["id"]: c for c in r.json().get("data", [])}
+
+def parse_dt(iso_str):
+    """Parses Meta's timestamps ('...Z' or '...+0000') regardless of Python
+    version — datetime.fromisoformat only accepts the colon-offset form
+    ('+00:00') on Python < 3.11, so a bare '+0000' silently fails to parse
+    and gets swallowed, making end-date checks look like they never ended."""
+    if not iso_str:
+        return None
+    s = iso_str.replace("Z", "+00:00")
+    if len(s) >= 5 and s[-5] in "+-" and s[-4:].isdigit():
+        s = s[:-4] + s[-4:-2] + ":" + s[-2:]
+    try:
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+def campaign_status(meta, spend):
+    """Active/Paused/Ended, matching Meta's effective_status but also treating a
+    campaign as Ended once its scheduled end date has passed or its lifetime
+    budget has been exhausted (Meta doesn't flip effective_status for either)."""
+    effective    = meta.get("effective_status", "")
+    end_time_str = meta.get("end_time", "") or meta.get("stop_time", "")
+    now          = datetime.now(timezone.utc)
+    if effective == "ACTIVE":
+        ended = False
+        if end_time_str:
+            end_dt = parse_dt(end_time_str)
+            if end_dt:
+                ended = end_dt <= now
+        lb_check = int(meta.get("lifetime_budget", 0)) / 100
+        if not ended and lb_check > 0 and spend >= lb_check * 0.98:
+            ended = True
+        return "Ended" if ended else "Active"
+    elif effective == "PAUSED":
+        return "Paused"
+    elif effective in ("DELETED", "ARCHIVED"):
+        return "Ended"
+    else:
+        return effective.replace("_", " ").title()
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_thumbnails():
@@ -207,12 +246,8 @@ METRIC_HELP = {
 }
 
 def fmt_date(iso_str):
-    if not iso_str:
-        return ""
-    try:
-        return datetime.fromisoformat(iso_str.replace("Z", "+00:00")).strftime("%b %d, %Y")
-    except:
-        return iso_str[:10]
+    dt = parse_dt(iso_str)
+    return dt.strftime("%b %d, %Y") if dt else (iso_str[:10] if iso_str else "")
 
 with st.spinner("Loading Instagram data..."):
     campaigns, api_error = fetch_insights(preset)
@@ -221,10 +256,12 @@ with st.spinner("Loading Instagram data..."):
 
 # Brand-new active boosts with no delivery yet don't show up in insights data —
 # add them as zero-stat placeholders so a boost you just launched appears right away.
+# Only genuinely still-active ones qualify (not past their end date or budget) —
+# old abandoned/never-finished drafts that Meta still marks ACTIVE stay hidden.
 if not api_error:
     ids_with_data = {c.get("campaign_id") for c in campaigns}
     for cid, meta in camp_meta.items():
-        if cid in ids_with_data or meta.get("effective_status") != "ACTIVE":
+        if cid in ids_with_data or campaign_status(meta, 0) != "Active":
             continue
         campaigns.append({
             "campaign_id": cid, "campaign_name": meta.get("name", "Unnamed boost"),
@@ -272,7 +309,11 @@ if campaigns:
 
     st.markdown('<div class="section">Boost Breakdown</div>', unsafe_allow_html=True)
 
-    for c in sorted(campaigns, key=lambda x: camp_meta.get(x.get("campaign_id", ""), {}).get("created_time", ""), reverse=True):
+    def _sort_key(x):
+        meta = camp_meta.get(x.get("campaign_id", ""), {})
+        return meta.get("created_time") or meta.get("start_time") or ""
+
+    for c in sorted(campaigns, key=_sort_key, reverse=True):
         cid     = c.get("campaign_id", "")
         name    = c.get("campaign_name", "Unnamed boost")
         spend   = float(c.get("spend", 0))
@@ -292,27 +333,8 @@ if campaigns:
         cpp           = round(spend / purchases, 2) if purchases else 0
         pct           = round(spend / total_spend * 100) if total_spend else 0
 
-        meta         = camp_meta.get(cid, {})
-        effective    = meta.get("effective_status", "")
-        end_time_str = meta.get("end_time", "") or meta.get("stop_time", "")
-        now          = datetime.now(timezone.utc)
-        if effective == "ACTIVE":
-            ended = False
-            if end_time_str:
-                try:
-                    ended = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")) <= now
-                except:
-                    pass
-            lb_check = int(meta.get("lifetime_budget", 0)) / 100
-            if not ended and lb_check > 0 and spend >= lb_check * 0.98:
-                ended = True
-            status = "Ended" if ended else "Active"
-        elif effective == "PAUSED":
-            status = "Paused"
-        elif effective in ("DELETED", "ARCHIVED"):
-            status = "Ended"
-        else:
-            status = effective.replace("_", " ").title()
+        meta   = camp_meta.get(cid, {})
+        status = campaign_status(meta, spend)
 
         lb         = int(meta.get("lifetime_budget", 0)) / 100
         db         = int(meta.get("daily_budget", 0)) / 100

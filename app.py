@@ -278,12 +278,14 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+PURCHASE_ACTION_TYPES = {"purchase", "offsite_conversion.fb_pixel_purchase", "omni_purchase"}
+
 @st.cache_data(ttl=3600)
 def get_meta_summary():
     try:
         r = requests.get(
             f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/insights",
-            params={"fields": "spend,impressions,actions",
+            params={"fields": "spend,impressions,actions,action_values",
                     "date_preset": "maximum", "level": "campaign",
                     "access_token": ACCESS_TOKEN},
             timeout=15,
@@ -292,11 +294,20 @@ def get_meta_summary():
         total_spend   = sum(float(d.get("spend", 0)) for d in rows)
         total_impr    = sum(int(d.get("impressions", 0)) for d in rows)
         total_lclicks = 0
+        total_purch   = 0
+        total_revenue = 0.0
         for d in rows:
             for a in d.get("actions", []):
                 if a["action_type"] == "link_click":
                     total_lclicks += int(float(a["value"]))
-        return {"spend": total_spend, "impressions": total_impr, "clicks": total_lclicks}
+                elif a["action_type"] in PURCHASE_ACTION_TYPES:
+                    total_purch += int(float(a["value"]))
+            for av in d.get("action_values", []):
+                if av["action_type"] in PURCHASE_ACTION_TYPES:
+                    total_revenue += float(av["value"])
+        return {"spend": total_spend, "impressions": total_impr, "clicks": total_lclicks,
+                "purchases": total_purch, "revenue": total_revenue,
+                "roas": (total_revenue / total_spend) if total_spend else 0}
     except:
         return None
 
@@ -512,7 +523,8 @@ def get_google_ads_summary():
         ga_service = client.get_service("GoogleAdsService")
         customer_id = cfg["client_customer_id"].replace("-", "")
         query = """
-            SELECT metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+            SELECT metrics.impressions, metrics.clicks, metrics.cost_micros,
+                   metrics.conversions, metrics.conversions_value
             FROM campaign
             WHERE segments.date BETWEEN '2020-01-01' AND '2099-12-31'
               AND campaign.status != 'REMOVED'
@@ -522,13 +534,17 @@ def get_google_ads_summary():
         total_clicks = 0
         total_impressions = 0
         total_conversions = 0.0
+        total_conv_value = 0.0
         for row in response:
             total_spend += row.metrics.cost_micros / 1_000_000
             total_clicks += row.metrics.clicks
             total_impressions += row.metrics.impressions
             total_conversions += row.metrics.conversions
+            total_conv_value += row.metrics.conversions_value
         return {"spend": total_spend, "clicks": total_clicks,
-                "impressions": total_impressions, "conversions": total_conversions}
+                "impressions": total_impressions, "conversions": total_conversions,
+                "conv_value": total_conv_value,
+                "roas": (total_conv_value / total_spend) if total_spend else 0}
     except Exception:
         return None
 
@@ -537,17 +553,25 @@ def get_instagram_summary():
     try:
         r = requests.get(
             f"https://graph.facebook.com/v19.0/{IG_AD_ACCOUNT_ID}/insights",
-            params={"fields": "spend,reach,impressions,actions", "level": "account",
+            params={"fields": "spend,reach,impressions,actions,action_values", "level": "account",
                     "date_preset": "maximum", "access_token": ACCESS_TOKEN},
             timeout=15,
         )
         d = r.json().get("data", [{}])[0]
-        clicks = 0
+        clicks, purchases, revenue = 0, 0, 0.0
         for a in d.get("actions", []):
             if a.get("action_type") == "link_click":
                 clicks = int(float(a["value"]))
-        return {"spend": float(d.get("spend", 0)), "reach": int(d.get("reach", 0)),
-                "impressions": int(d.get("impressions", 0)), "clicks": clicks}
+            elif a.get("action_type") in PURCHASE_ACTION_TYPES:
+                purchases = int(float(a["value"]))
+        for av in d.get("action_values", []):
+            if av.get("action_type") in PURCHASE_ACTION_TYPES:
+                revenue = float(av["value"])
+        spend = float(d.get("spend", 0))
+        return {"spend": spend, "reach": int(d.get("reach", 0)),
+                "impressions": int(d.get("impressions", 0)), "clicks": clicks,
+                "purchases": purchases, "revenue": revenue,
+                "roas": (revenue / spend) if spend else 0}
     except:
         return None
 
@@ -1069,32 +1093,128 @@ with col4:
 st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 st.markdown('<div class="section">Export</div>', unsafe_allow_html=True)
 
+def _sanitize_pdf_text(s):
+    if not s:
+        return ""
+    repl = {"—": "-", "–": "-", "‘": "'", "’": "'",
+            "“": '"', "”": '"', "…": "...", "→": "->",
+            "×": "x", "•": "-", "·": "-"}
+    for k, v in repl.items():
+        s = s.replace(k, v)
+    return s.encode("latin-1", "replace").decode("latin-1")
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_ai_report_narrative(meta_ctx, google_ctx, ig_ctx, shop_ctx, biz_ctx):
+    try:
+        import anthropic as ac
+        client = ac.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+        system_p = f"""You are a sharp, no-fluff growth analyst writing the analysis section of an internal \
+report for the owner of Shpapi, a sunglasses and clothing brand. Base every statement strictly on the \
+numbers given below. Never invent a number or a cause you can't support with this data. If a platform \
+shows $0 or near-$0 attributed revenue despite real spend, or a conversion value that looks like a flat \
+placeholder rather than real order values, say so plainly — that's a tracking problem worth flagging, \
+not something to paper over.
+
+LIVE DATA (all-time unless noted):
+- Meta Ads: {meta_ctx}
+- Google Ads: {google_ctx}
+- Instagram Boosts: {ig_ctx}
+- Shopify: {shop_ctx}
+- Business-wide: {biz_ctx}
+
+Respond in EXACTLY this format and nothing else — no markdown, no extra headers:
+
+WORKING:
+<2-3 plain sentences on what's genuinely working, citing specific numbers>
+IMPROVE:
+<2-3 plain sentences on the biggest problems the data shows, citing specific numbers>
+RECOMMENDATIONS:
+<3-4 short, specific, actionable lines, one per line>"""
+        resp = client.messages.create(
+            model="claude-opus-5", max_tokens=2000,
+            system=system_p,
+            messages=[{"role": "user", "content": "Write the report analysis now."}],
+        )
+        return next((b.text for b in resp.content if hasattr(b, "text")), "")
+    except Exception:
+        return None
+
+def _parse_narrative(text):
+    sections = {"WORKING": [], "IMPROVE": [], "RECOMMENDATIONS": []}
+    current = None
+    for line in (text or "").split("\n"):
+        stripped = line.strip()
+        upper = stripped.upper()
+        for key in sections:
+            if upper.startswith(key + ":"):
+                current = key
+                stripped = stripped[len(key) + 1:].strip()
+                break
+        if stripped:
+            sections[current if current else "WORKING"].append(stripped)
+    return {k: " ".join(v) if k != "RECOMMENDATIONS" else v for k, v in sections.items()}
+
 if not FPDF_OK:
     st.info("PDF export will be available after the next deploy (fpdf2 is installing).")
 else:
     def _build_dashboard_pdf():
+        total_spend = sum(x["spend"] for x in (meta, google, instagram) if x)
+        roas = (insights["total_revenue"] / total_spend) if insights and total_spend else None
+        cac  = (total_spend / insights["unique_customers"]) if insights and total_spend and insights["unique_customers"] else None
+
+        meta_ctr  = (meta["clicks"] / meta["impressions"] * 100) if meta and meta.get("impressions") else 0
+        google_ctr = (google["clicks"] / google["impressions"] * 100) if google and google.get("impressions") else 0
+        ig_ctr    = (instagram["clicks"] / instagram["impressions"] * 100) if instagram and instagram.get("impressions") else 0
+
+        meta_ctx = (f"Spend ${meta['spend']:,.2f}, Impressions {meta['impressions']:,}, "
+                    f"Clicks {meta['clicks']:,} (CTR {meta_ctr:.2f}%), Purchases {meta['purchases']:,}, "
+                    f"Revenue ${meta['revenue']:,.2f}, ROAS {meta['roas']:.2f}x") if meta else "unavailable"
+        google_ctx = (f"Spend ${google['spend']:,.2f}, Impressions {google['impressions']:,}, "
+                      f"Clicks {google['clicks']:,} (CTR {google_ctr:.2f}%), Conversions {google['conversions']:.1f}, "
+                      f"Conv. Value ${google['conv_value']:,.2f}, ROAS {google['roas']:.2f}x") if google else "unavailable"
+        ig_ctx = (f"Spend ${instagram['spend']:,.2f}, Reach {instagram['reach']:,}, "
+                  f"Impressions {instagram['impressions']:,}, Clicks {instagram['clicks']:,} (CTR {ig_ctr:.2f}%), "
+                  f"Purchases {instagram['purchases']:,}, Revenue ${instagram['revenue']:,.2f}, "
+                  f"ROAS {instagram['roas']:.2f}x") if instagram else "unavailable"
+        shop_ctx = (f"Revenue last 30d ${shopify['revenue_30d']:,.2f}, Orders last 30d {shopify['orders_30d']}, "
+                    f"Total orders all-time {shopify['total_orders']:,}") if shopify else "unavailable"
+        biz_ctx = (f"Total revenue ${insights['total_revenue']:,.2f}, Revenue MTD ${insights['revenue_mtd']:,.2f}, "
+                   f"AOV ${insights['aov']:,.2f}, Overall ROAS {roas:.2f}x, Est. CAC ${cac:,.2f}, "
+                   f"Repeat purchase rate {insights['repeat_rate']*100:.1f}%, Refund rate {insights['refund_rate']*100:.1f}%, "
+                   f"Total ad spend across all platforms ${total_spend:,.2f}") if insights and roas is not None and cac is not None else "unavailable"
+
+        narrative_raw = get_ai_report_narrative(meta_ctx, google_ctx, ig_ctx, shop_ctx, biz_ctx)
+        narrative = _parse_narrative(narrative_raw) if narrative_raw else None
+
         pdf = FPDF()
         pdf.add_page()
         pdf.set_margins(16, 16, 16)
         pdf.set_auto_page_break(auto=True, margin=20)
 
-        # Header
-        pdf.set_fill_color(10, 22, 40)
-        pdf.rect(0, 0, 210, 38, "F")
-        pdf.set_font("Helvetica", "B", 22)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_xy(0, 7)
-        pdf.cell(210, 10, "SHPAPI", align="C")
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(150, 165, 190)
-        pdf.set_xy(0, 20)
-        pdf.cell(210, 6, f"Analytics Dashboard Export  -  {date.today().strftime('%B %d, %Y')}", align="C")
-        pdf.set_y(46)
+        def _banner_header():
+            pdf.set_fill_color(10, 22, 40)
+            pdf.rect(0, 0, 210, 38, "F")
+            pdf.set_font("Helvetica", "B", 22)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_xy(0, 7)
+            pdf.cell(210, 10, "SHPAPI", align="C")
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(150, 165, 190)
+            pdf.set_xy(0, 20)
+            pdf.cell(210, 6, f"Analytics Dashboard Export  -  {date.today().strftime('%B %d, %Y')}", align="C")
+            pdf.set_y(46)
+
+        def _mini_header(label):
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(150, 165, 190)
+            pdf.set_xy(16, 12)
+            pdf.cell(178, 5, _sanitize_pdf_text(f"SHPAPI  -  {label}"), align="L")
+            pdf.set_y(24)
 
         def _section(title):
             pdf.set_font("Helvetica", "B", 8)
             pdf.set_text_color(80, 100, 140)
-            pdf.cell(0, 5, title, ln=True)
+            pdf.cell(0, 5, _sanitize_pdf_text(title), ln=True)
             pdf.set_draw_color(59, 130, 246)
             pdf.line(16, pdf.get_y(), 194, pdf.get_y())
             pdf.ln(4)
@@ -1108,70 +1228,175 @@ else:
             pdf.set_font("Helvetica", "B", 7)
             pdf.set_text_color(120, 140, 175)
             pdf.set_xy(x + 4, y + 5)
-            pdf.cell(w - 8, 4, title.upper())
+            pdf.cell(w - 8, 4, _sanitize_pdf_text(title.upper()))
             oy = y + 12
             for label, value in rows:
                 pdf.set_font("Helvetica", "", 6)
                 pdf.set_text_color(110, 130, 165)
                 pdf.set_xy(x + 4, oy)
-                pdf.cell(w - 8, 3.5, label.upper())
+                pdf.cell(w - 8, 3.5, _sanitize_pdf_text(label.upper()))
                 oy += 4
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.set_text_color(240, 245, 255)
                 pdf.set_xy(x + 4, oy)
-                pdf.cell(w - 8, 6, value)
+                pdf.cell(w - 8, 6, _sanitize_pdf_text(value))
                 oy += 8
 
-        _section("PLATFORM OVERVIEW")
+        def _stat_tile(x, y, w, h, label, value, sub):
+            pdf.set_fill_color(14, 31, 60)
+            pdf.set_draw_color(25, 45, 75)
+            pdf.rect(x, y, w, h, "FD")
+            pdf.set_font("Helvetica", "", 6)
+            pdf.set_text_color(110, 130, 165)
+            pdf.set_xy(x + 4, y + 4)
+            pdf.cell(w - 8, 3.5, _sanitize_pdf_text(label.upper()))
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_text_color(240, 245, 255)
+            pdf.set_xy(x + 4, y + 9)
+            pdf.cell(w - 8, 6, _sanitize_pdf_text(value))
+            pdf.set_font("Helvetica", "", 6)
+            pdf.set_text_color(90, 110, 145)
+            pdf.set_xy(x + 4, y + 17)
+            pdf.cell(w - 8, 4, _sanitize_pdf_text(sub))
+
+        def _paragraph(title, body, rgb):
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_text_color(*rgb)
+            pdf.set_x(16)
+            pdf.cell(0, 7, _sanitize_pdf_text(title), ln=True)
+            pdf.set_font("Helvetica", "", 9.5)
+            pdf.set_text_color(210, 220, 235)
+            pdf.set_x(16)
+            pdf.multi_cell(178, 5.2, _sanitize_pdf_text(body) or "Not enough data to analyze yet.")
+            pdf.ln(4)
+
+        # ── Page 1: Header + Business Snapshot ──────────────────────────
+        _banner_header()
+        _section("BUSINESS SNAPSHOT — ALL TIME")
+
+        if insights and roas is not None and cac is not None:
+            tiles = [
+                ("Total Revenue", f"${insights['total_revenue']:,.2f}", "All time"),
+                ("Revenue MTD", f"${insights['revenue_mtd']:,.2f}", "Month to date"),
+                ("Total Orders", f"{insights['total_orders']:,}", f"{insights['orders_mtd']:,} MTD"),
+                ("Units Sold", f"{insights['units_sold']:,}", "All time"),
+                ("Avg. Order Value", f"${insights['aov']:,.2f}", "Revenue / orders"),
+                ("Blended ROAS", f"{roas:.2f}x", "Revenue / total ad spend"),
+                ("Est. CAC", f"${cac:,.2f}", "Ad spend / customers"),
+                ("Repeat Rate", f"{insights['repeat_rate']*100:.1f}%", "Customers who bought again"),
+            ]
+            tw, tgap = (178 - 3 * 5) / 4, 5
+            ty = pdf.get_y()
+            for i, (label, value, sub) in enumerate(tiles):
+                row, col = divmod(i, 4)
+                tx = 16 + col * (tw + tgap)
+                _stat_tile(tx, ty + row * (24 + tgap), tw, 24, label, value, sub)
+            pdf.set_y(ty + 2 * (24 + tgap) + 4)
+        else:
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(120, 140, 175)
+            pdf.cell(0, 6, "Business snapshot unavailable - could not load Shopify order data.", ln=True)
+            pdf.ln(4)
+
+        # ── Page 2: Platform Performance ────────────────────────────────
+        pdf.add_page()
+        _mini_header("Platform Performance")
+        _section("PLATFORM PERFORMANCE — ALL TIME")
 
         cw, gap = 85, 8
         x1, x2  = 16, 16 + cw + gap
-        ch       = 72
-        y0       = pdf.get_y()
+        ch      = 82
+        y0      = pdf.get_y()
 
-        # Meta Ads
         _card(x1, y0, cw, ch, "Meta Ads", [
-            ("Total Spend (All Time)", f"${meta['spend']:,.2f}" if meta else "-"),
-            ("Link Clicks",            f"{meta['clicks']:,}"   if meta else "-"),
-            ("Impressions",            f"{meta['impressions']:,}" if meta else "-"),
+            ("Total Spend", f"${meta['spend']:,.2f}" if meta else "-"),
+            ("Impressions", f"{meta['impressions']:,}" if meta else "-"),
+            ("Link Clicks (CTR)", f"{meta['clicks']:,} ({meta_ctr:.2f}%)" if meta else "-"),
+            ("Purchases Tracked", f"{meta['purchases']:,}" if meta else "-"),
+            ("Revenue Tracked", f"${meta['revenue']:,.2f}" if meta else "-"),
+            ("ROAS", f"{meta['roas']:.2f}x" if meta else "-"),
         ], (59, 130, 246))
 
-        # Shopify
-        _card(x2, y0, cw, ch, "Shopify", [
-            ("Revenue (Last 30 Days)", f"${shopify['revenue_30d']:,.2f}" if shopify else "-"),
-            ("Orders (Last 30 Days)",  f"{shopify['orders_30d']:,}"       if shopify else "-"),
-            ("Total Orders (All Time)",f"{shopify['total_orders']:,}"     if shopify else "-"),
-        ], (34, 197, 94))
-
-        y1 = y0 + ch + gap
-
-        # Google Ads
-        _card(x1, y1, cw, ch, "Google Ads", [
-            ("Total Spend (All Time)", f"${google['spend']:,.2f}"       if google else "-"),
-            ("Clicks",                 f"{google['clicks']:,}"           if google else "-"),
-            ("Impressions",            f"{google['impressions']:,}"      if google else "-"),
+        _card(x2, y0, cw, ch, "Google Ads", [
+            ("Total Spend", f"${google['spend']:,.2f}" if google else "-"),
+            ("Impressions", f"{google['impressions']:,}" if google else "-"),
+            ("Clicks (CTR)", f"{google['clicks']:,} ({google_ctr:.2f}%)" if google else "-"),
+            ("Conversions", f"{google['conversions']:.1f}" if google else "-"),
+            ("Conv. Value", f"${google['conv_value']:,.2f}" if google else "-"),
+            ("ROAS", f"{google['roas']:.2f}x" if google else "-"),
         ], (139, 92, 246))
 
-        # Instagram
-        _card(x2, y1, cw, ch, "Instagram Boosts", [
-            ("Total Spend (All Time)", f"${instagram['spend']:,.2f}"     if instagram else "-"),
-            ("Reach",                  f"{instagram['reach']:,}"          if instagram else "-"),
-            ("Impressions",            f"{instagram['impressions']:,}"    if instagram else "-"),
+        y1 = y0 + ch + gap
+        _card(x1, y1, cw, ch, "Instagram Boosts", [
+            ("Total Spend", f"${instagram['spend']:,.2f}" if instagram else "-"),
+            ("Reach", f"{instagram['reach']:,}" if instagram else "-"),
+            ("Impressions", f"{instagram['impressions']:,}" if instagram else "-"),
+            ("Clicks (CTR)", f"{instagram['clicks']:,} ({ig_ctr:.2f}%)" if instagram else "-"),
+            ("Purchases Tracked", f"{instagram['purchases']:,}" if instagram else "-"),
+            ("Revenue Tracked", f"${instagram['revenue']:,.2f}" if instagram else "-"),
+            ("ROAS", f"{instagram['roas']:.2f}x" if instagram else "-"),
         ], (236, 72, 153))
 
-        pdf.set_y(y1 + ch + 10)
+        _card(x2, y1, cw, ch, "Shopify", [
+            ("Revenue (30 Days)", f"${shopify['revenue_30d']:,.2f}" if shopify else "-"),
+            ("Orders (30 Days)", f"{shopify['orders_30d']:,}" if shopify else "-"),
+            ("Total Orders", f"{shopify['total_orders']:,}" if shopify else "-"),
+            ("Avg. Order Value", f"${insights['aov']:,.2f}" if insights else "-"),
+            ("Repeat Rate", f"{insights['repeat_rate']*100:.1f}%" if insights else "-"),
+            ("Refund Rate", f"{insights['refund_rate']*100:.1f}%" if insights else "-"),
+        ], (34, 197, 94))
 
-        # Footer
-        pdf.set_y(-16)
+        pdf.set_y(y1 + ch + 10)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.set_text_color(90, 110, 145)
+        pdf.set_x(16)
+        pdf.multi_cell(178, 4, "Purchases/Revenue Tracked reflect Meta and Instagram's own attributed conversions, "
+                               "which can under- or over-count vs. real Shopify orders depending on pixel/CAPI setup. "
+                               "Google's Conv. Value comes from Google's own conversion actions.")
+
+        # ── Page 3: Analysis ─────────────────────────────────────────────
+        pdf.add_page()
+        _mini_header("Analysis")
+        _section("WHAT THE DATA SAYS")
+
+        if narrative:
+            _paragraph("WHAT'S WORKING", narrative.get("WORKING", ""), (34, 197, 94))
+            _paragraph("WHAT NEEDS IMPROVEMENT", narrative.get("IMPROVE", ""), (239, 68, 68))
+
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_text_color(59, 130, 246)
+            pdf.set_x(16)
+            pdf.cell(0, 7, "RECOMMENDATIONS", ln=True)
+            pdf.set_font("Helvetica", "", 9.5)
+            pdf.set_text_color(210, 220, 235)
+            for rec in (narrative.get("RECOMMENDATIONS") or ["Not enough data to analyze yet."]):
+                pdf.set_x(16)
+                pdf.multi_cell(178, 5.2, f"-  {_sanitize_pdf_text(rec)}")
+                pdf.ln(1)
+        else:
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(180, 195, 215)
+            pdf.set_x(16)
+            pdf.multi_cell(178, 5.5, "AI analysis is temporarily unavailable for this export. "
+                                     "The Business Snapshot and Platform Performance numbers above are still live and accurate.")
+
+        # Footer — flows after content instead of pinning to bottom-of-page, so a
+        # long AI narrative that already fills the page doesn't push it onto a
+        # near-empty extra page via the auto page-break margin.
+        pdf.ln(6)
         pdf.set_font("Helvetica", "", 7)
         pdf.set_text_color(110, 130, 165)
-        pdf.cell(0, 5, f"Generated by Shpapi Vision  ·  shpapivision.streamlit.app  ·  {date.today().strftime('%B %d, %Y')}", align="C")
+        pdf.set_x(16)
+        pdf.cell(178, 5, f"Generated by Shpapi Vision  -  shpapivision.streamlit.app  -  {date.today().strftime('%B %d, %Y')}", align="C")
 
         return bytes(pdf.output())
 
+    with st.spinner("Building report (this calls Claude for the analysis section, may take a few seconds)..."):
+        _pdf_bytes = _build_dashboard_pdf()
+
     st.download_button(
         label="Download Dashboard PDF",
-        data=_build_dashboard_pdf(),
+        data=_pdf_bytes,
         file_name=f"shpapi_dashboard_{date.today().strftime('%Y-%m-%d')}.pdf",
         mime="application/pdf",
     )

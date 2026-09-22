@@ -720,11 +720,6 @@ with st.spinner("Loading overview..."):
     google    = get_google_ads_summary()
     insights  = get_business_insights()
 
-with st.spinner("Loading live campaign status..."):
-    meta_live   = get_meta_live_status()
-    google_live = get_google_live_status()
-    ig_live     = get_instagram_live_status()
-
 def _ctr_str(summary):
     if not summary or not summary.get("impressions"):
         return "—"
@@ -762,30 +757,43 @@ def _live_row(label, color, summary, live, is_last):
         f'</tr>'
     )
 
-_platform_rows = [
-    ("Meta Ads",   "#3b82f6", meta,      meta_live),
-    ("Google Ads", "#8b5cf6", google,    google_live),
-    ("Instagram",  "#ec4899", instagram, ig_live),
-]
-_rows_html = "".join(
-    _live_row(label, color, summary, live, i == len(_platform_rows) - 1)
-    for i, (label, color, summary, live) in enumerate(_platform_rows)
-)
+@st.fragment(run_every="60s")
+def render_live_campaigns():
+    """Self-refreshing: re-checks live status every 60s on its own, without
+    reloading the whole page, so 'Live' vs 'X days since last ad' can't go
+    stale just because nobody happened to reload the browser tab. The
+    underlying status calls are cache_data(ttl=300), so this mostly re-renders
+    the same data and only actually hits the APIs again once that expires."""
+    meta_live   = get_meta_live_status()
+    google_live = get_google_live_status()
+    ig_live     = get_instagram_live_status()
 
-st.markdown('<div class="section">Live Campaigns</div>', unsafe_allow_html=True)
-_live_table_html = (
-    f'<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;overflow:hidden;margin-bottom:2rem;">'
-    f'<table style="width:100%;border-collapse:collapse;">'
-    f'<thead><tr style="border-bottom:1px solid {BORDER};">'
-    f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Platform &amp; Current Campaign</th>'
-    f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">CTR &nbsp;·&nbsp; % of people who clicked your ad after seeing it</th>'
-    f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Status</th>'
-    f'</tr></thead>'
-    f'<tbody>{_rows_html}</tbody>'
-    f'</table>'
-    f'</div>'
-)
-st.markdown(_live_table_html, unsafe_allow_html=True)
+    _platform_rows = [
+        ("Meta Ads",   "#3b82f6", meta,      meta_live),
+        ("Google Ads", "#8b5cf6", google,    google_live),
+        ("Instagram",  "#ec4899", instagram, ig_live),
+    ]
+    _rows_html = "".join(
+        _live_row(label, color, summary, live, i == len(_platform_rows) - 1)
+        for i, (label, color, summary, live) in enumerate(_platform_rows)
+    )
+
+    st.markdown('<div class="section">Live Campaigns</div>', unsafe_allow_html=True)
+    _live_table_html = (
+        f'<div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;overflow:hidden;margin-bottom:2rem;">'
+        f'<table style="width:100%;border-collapse:collapse;">'
+        f'<thead><tr style="border-bottom:1px solid {BORDER};">'
+        f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Platform &amp; Current Campaign</th>'
+        f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">CTR &nbsp;·&nbsp; % of people who clicked your ad after seeing it</th>'
+        f'<th style="text-align:left;padding:0.85rem 1.4rem;font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:{T3};">Status</th>'
+        f'</tr></thead>'
+        f'<tbody>{_rows_html}</tbody>'
+        f'</table>'
+        f'</div>'
+    )
+    st.markdown(_live_table_html, unsafe_allow_html=True)
+
+render_live_campaigns()
 
 with st.spinner("Loading growth history..."):
     growth_shopify     = get_shopify_growth_monthly()

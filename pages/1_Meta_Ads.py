@@ -6,6 +6,7 @@ import plotly.express as px
 from PIL import Image
 import numpy as np
 import os
+from datetime import datetime, timezone
 
 ACCESS_TOKEN  = st.secrets["META_ACCESS_TOKEN"]
 AD_ACCOUNT_ID = st.secrets["AD_ACCOUNT_ID"]
@@ -122,13 +123,9 @@ with st.container(key="navbar"):
         st.page_link("pages/9_UGC_Creators.py", label="UGC Creators")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 1.8rem;"></div>', unsafe_allow_html=True)
 
-st.markdown(f"""
-<div style="padding-bottom:1.4rem;border-bottom:1px solid {BORDER};margin-bottom:2rem;">
-  <div style="font-size:0.62rem;font-weight:600;text-transform:uppercase;letter-spacing:2.5px;color:{T3};">
-    Ad Performance Dashboard &nbsp;·&nbsp; Meta Ads &nbsp;·&nbsp; All Time
-  </div>
-</div>
-""", unsafe_allow_html=True)
+PURCHASE_TYPES     = {"purchase", "offsite_conversion.fb_pixel_purchase", "omni_purchase"}
+PRODUCT_VIEW_TYPES = {"offsite_conversion.fb_pixel_view_content", "view_content", "omni_view_content"}
+WISHLIST_TYPES     = {"onsite_conversion.add_to_wishlist", "omni_add_to_wishlist"}
 
 @st.cache_data(ttl=3600)
 def get_ad_data():
@@ -155,9 +152,6 @@ def get_ad_data():
         return pd.DataFrame()
     if "data" not in data or not data["data"]:
         return pd.DataFrame()
-    PURCHASE_TYPES     = {"purchase", "offsite_conversion.fb_pixel_purchase", "omni_purchase"}
-    PRODUCT_VIEW_TYPES = {"offsite_conversion.fb_pixel_view_content", "view_content", "omni_view_content"}
-    WISHLIST_TYPES     = {"onsite_conversion.add_to_wishlist", "omni_add_to_wishlist"}
     rows = []
     for item in data["data"]:
         purchases, revenue = 0, 0.0
@@ -176,12 +170,88 @@ def get_ad_data():
         cid = item.get("campaign_id", "")
         start_date, end_date = camp_dates.get(cid, (item.get("date_start", ""), item.get("date_stop", "")))
         rows.append({
-            "Campaign": item.get("campaign_name", "Unknown"), "Start Date": start_date, "End Date": end_date,
+            "Campaign ID": cid, "Campaign": item.get("campaign_name", "Unknown"),
+            "Start Date": start_date, "End Date": end_date,
             "Spend ($)": float(item.get("spend", 0)), "Impressions": int(item.get("impressions", 0)),
             "Link Clicks": link_clicks, "Landing Page Views": lpv, "Product Views": product_views,
             "Wishlist Adds": wishlist, "Video Views": video_views, "Purchases": purchases, "Revenue ($)": revenue,
         })
     return pd.DataFrame(rows)
+
+def parse_dt(iso_str):
+    """Parses Meta's timestamps ('...Z' or '...+0000') regardless of Python
+    version — datetime.fromisoformat only accepts the colon-offset form
+    ('+00:00') on Python < 3.11, so a bare '+0000' silently fails to parse
+    and gets swallowed, making end-date checks look like they never ended."""
+    if not iso_str:
+        return None
+    s = iso_str.replace("Z", "+00:00")
+    if len(s) >= 5 and s[-5] in "+-" and s[-4:].isdigit():
+        s = s[:-4] + s[-4:-2] + ":" + s[-2:]
+    try:
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+def campaign_status(meta, spend):
+    """Meta's effective_status stays ACTIVE for a campaign long after it has
+    actually stopped delivering — its ad sets can be turned off individually,
+    or it can be past its own scheduled end date or lifetime budget, without
+    the campaign object itself ever flipping to PAUSED. Check both explicitly
+    instead of trusting effective_status alone."""
+    effective    = meta.get("effective_status", "")
+    end_time_str = meta.get("end_time", "") or meta.get("stop_time", "")
+    now          = datetime.now(timezone.utc)
+    if effective == "ACTIVE":
+        ended = False
+        if end_time_str:
+            end_dt = parse_dt(end_time_str)
+            if end_dt:
+                ended = end_dt <= now
+        lb_check = int(meta.get("lifetime_budget", 0)) / 100
+        if not ended and lb_check > 0 and spend >= lb_check * 0.98:
+            ended = True
+        return "Ended" if ended else "Active"
+    elif effective == "PAUSED":
+        return "Paused"
+    elif effective in ("DELETED", "ARCHIVED"):
+        return "Ended"
+    else:
+        return effective.replace("_", " ").title()
+
+@st.cache_data(ttl=300)
+def get_active_campaign_ids(spend_by_campaign):
+    r = requests.get(
+        f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/campaigns",
+        params={"fields": "id,effective_status,end_time,stop_time,lifetime_budget",
+                "limit": 500, "access_token": ACCESS_TOKEN},
+    )
+    camps = r.json().get("data", [])
+    return [c["id"] for c in camps
+            if campaign_status(c, spend_by_campaign.get(c["id"], 0.0)) == "Active"]
+
+@st.cache_data(ttl=300)
+def get_today_insights():
+    url = f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/insights"
+    params = {
+        "fields": "campaign_id,spend,actions,action_values",
+        "date_preset": "today", "level": "campaign", "access_token": ACCESS_TOKEN,
+    }
+    r = requests.get(url, params=params)
+    data = r.json().get("data", [])
+    out = {}
+    for item in data:
+        purchases, revenue = 0, 0.0
+        for a in item.get("actions", []):
+            if a["action_type"] in PURCHASE_TYPES:
+                purchases = int(float(a["value"]))
+        for av in item.get("action_values", []):
+            if av["action_type"] in PURCHASE_TYPES:
+                revenue = float(av["value"])
+        out[item.get("campaign_id", "")] = {
+            "spend": float(item.get("spend", 0)), "purchases": purchases, "revenue": revenue,
+        }
+    return out
 
 def make_bar(series_x, series_y, fmt="number", order=None):
     df_bar = pd.DataFrame({"x": series_x.values, "y": series_y.values})
@@ -255,6 +325,61 @@ def make_funnel_html(totals):
     return f'<div style="padding:0.25rem 0.5rem 0.5rem;">{rows}</div>'
 
 df = get_ad_data()
+
+spend_by_campaign = (df.groupby("Campaign ID")["Spend ($)"].sum().to_dict()
+                     if not df.empty and "Campaign ID" in df.columns else {})
+active_ids = get_active_campaign_ids(spend_by_campaign)
+if active_ids:
+    today_map = get_today_insights()
+    t_spend = sum(v["spend"]     for cid, v in today_map.items() if cid in active_ids)
+    t_purch = sum(v["purchases"] for cid, v in today_map.items() if cid in active_ids)
+    t_rev   = sum(v["revenue"]   for cid, v in today_map.items() if cid in active_ids)
+    t_roas  = (t_rev / t_spend) if t_spend else 0
+    t_roas_str = f"{t_roas:.2f}x" if t_roas else "—"
+
+    if not df.empty and "Campaign ID" in df.columns:
+        adf     = df[df["Campaign ID"].isin(active_ids)]
+        a_spend = adf["Spend ($)"].sum()
+        a_purch = int(adf["Purchases"].sum())
+        a_rev   = adf["Revenue ($)"].sum()
+    else:
+        a_spend, a_purch, a_rev = 0.0, 0, 0.0
+    a_roas     = (a_rev / a_spend) if a_spend else 0
+    a_roas_str = f"{a_roas:.2f}x" if a_roas else "—"
+    n_active   = len(active_ids)
+
+    st.markdown(f"""
+    <div style="padding-bottom:1.4rem;border-bottom:1px solid {BORDER};margin-bottom:2rem;">
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.2rem;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;display:inline-block;"></span>
+        <span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:2.5px;color:#22c55e;">
+          Live &nbsp;·&nbsp; {n_active} Active Campaign{'s' if n_active != 1 else ''}
+        </span>
+      </div>
+      <div class="stat-label" style="margin-bottom:0.5rem;">Today</div>
+      <div class="kpi-grid" style="margin-bottom:1.4rem;">
+        <div class="kpi"><div class="kpi-label">Purchases</div><div class="kpi-value gold">{t_purch:,}</div></div>
+        <div class="kpi"><div class="kpi-label">Revenue</div><div class="kpi-value gold">${t_rev:,.2f}</div></div>
+        <div class="kpi"><div class="kpi-label">ROAS</div><div class="kpi-value">{t_roas_str}</div></div>
+        <div class="kpi"><div class="kpi-label">Spend</div><div class="kpi-value">${t_spend:,.2f}</div></div>
+      </div>
+      <div class="stat-label" style="margin-bottom:0.5rem;">All-Time &middot; Active Campaigns Only</div>
+      <div class="kpi-grid" style="margin-bottom:0;">
+        <div class="kpi"><div class="kpi-label">Purchases</div><div class="kpi-value gold">{a_purch:,}</div></div>
+        <div class="kpi"><div class="kpi-label">Revenue</div><div class="kpi-value gold">${a_rev:,.2f}</div></div>
+        <div class="kpi"><div class="kpi-label">ROAS</div><div class="kpi-value">{a_roas_str}</div></div>
+        <div class="kpi"><div class="kpi-label">Spend</div><div class="kpi-value">${a_spend:,.2f}</div></div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown(f"""
+<div style="padding-bottom:1.4rem;border-bottom:1px solid {BORDER};margin-bottom:2rem;">
+  <div style="font-size:0.62rem;font-weight:600;text-transform:uppercase;letter-spacing:2.5px;color:{T3};">
+    Ad Performance Dashboard &nbsp;·&nbsp; Meta Ads &nbsp;·&nbsp; All Time
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 if not df.empty:
     df["CTR (%)"] = (df["Link Clicks"] / df["Impressions"].replace(0, 1) * 100).round(2)

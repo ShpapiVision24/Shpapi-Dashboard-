@@ -6,6 +6,7 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from meta_status import campaign_status
 
 try:
     from fpdf import FPDF
@@ -606,31 +607,64 @@ def _days_since(date_str):
         return None
     return (date.today() - datetime.strptime(date_str, "%Y-%m-%d").date()).days
 
-@st.cache_data(ttl=300)
-def get_meta_live_status():
+def _campaign_spend_map(account_id):
+    """All-time spend per campaign — needed to check lifetime-budget exhaustion."""
     try:
-        last_date, campaign_name = _last_active_campaign(AD_ACCOUNT_ID)
-        if last_date is None:
+        rows, url = [], f"https://graph.facebook.com/v19.0/{account_id}/insights"
+        params = {"fields": "campaign_id,spend", "level": "campaign", "date_preset": "maximum",
+                   "access_token": ACCESS_TOKEN, "limit": 200}
+        while url:
+            r = requests.get(url, params=params, timeout=15)
+            data = r.json()
+            rows.extend(data.get("data", []))
+            url    = data.get("paging", {}).get("next")
+            params = {}
+        spend_map = {}
+        for d in rows:
+            cid = d.get("campaign_id")
+            if cid:
+                spend_map[cid] = spend_map.get(cid, 0.0) + float(d.get("spend", 0))
+        return spend_map
+    except Exception:
+        return {}
+
+def _platform_live_status(account_id):
+    """Whether this Meta ad account has a genuinely still-running campaign.
+
+    Checking effective_status == 'ACTIVE' alone isn't enough — Meta doesn't
+    flip it just because a campaign passed its own scheduled end date or ran
+    out of lifetime budget, so that alone can report "Live" for a campaign
+    that visibly ended hours or days ago. Use the same campaign_status check
+    (effective_status + end date + budget) as the Meta Ads and Instagram
+    detail pages, so this can't disagree with what those pages show.
+    """
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v19.0/{account_id}/campaigns",
+            params={"fields": "id,name,effective_status,end_time,stop_time,lifetime_budget,updated_time",
+                    "limit": 500, "access_token": ACCESS_TOKEN},
+            timeout=15,
+        )
+        camps = r.json().get("data", [])
+        if not camps:
             return None
-        days = _days_since(last_date)
-        if days is not None and days <= 1:
-            return {"status": "live", "campaign_name": campaign_name, "days_since": 0}
-        return {"status": "paused", "campaign_name": campaign_name, "days_since": days}
+        spend_map    = _campaign_spend_map(account_id)
+        truly_active = [c for c in camps if campaign_status(c, spend_map.get(c["id"], 0.0)) == "Active"]
+        if truly_active:
+            current = max(truly_active, key=lambda c: c.get("updated_time", ""))
+            return {"status": "live", "campaign_name": current.get("name"), "days_since": 0}
+        last_date, campaign_name = _last_active_campaign(account_id)
+        return {"status": "paused", "campaign_name": campaign_name, "days_since": _days_since(last_date)}
     except Exception:
         return None
 
 @st.cache_data(ttl=300)
+def get_meta_live_status():
+    return _platform_live_status(AD_ACCOUNT_ID)
+
+@st.cache_data(ttl=300)
 def get_instagram_live_status():
-    try:
-        last_date, campaign_name = _last_active_campaign(IG_AD_ACCOUNT_ID)
-        if last_date is None:
-            return None
-        days = _days_since(last_date)
-        if days is not None and days <= 1:
-            return {"status": "live", "campaign_name": campaign_name, "days_since": 0}
-        return {"status": "paused", "campaign_name": campaign_name, "days_since": days}
-    except Exception:
-        return None
+    return _platform_live_status(IG_AD_ACCOUNT_ID)
 
 @st.cache_data(ttl=300)
 def get_google_live_status():

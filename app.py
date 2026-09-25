@@ -63,6 +63,9 @@ if not check_password():
 from mobile import inject_mobile_css
 inject_mobile_css()
 
+from ios_theme import inject_ios_theme
+inject_ios_theme()
+
 if "ai_messages" not in st.session_state:
     st.session_state.ai_messages = []
 

@@ -30,6 +30,9 @@ if not check_password():
 from mobile import inject_mobile_css
 inject_mobile_css()
 
+from ios_theme import inject_ios_theme
+inject_ios_theme()
+
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');

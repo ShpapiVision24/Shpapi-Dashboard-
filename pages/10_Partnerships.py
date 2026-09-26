@@ -107,6 +107,20 @@ with st.container(key="navbar"):
         st.markdown(f'<div style="padding-top:1.1rem;"><span style="padding:0.35rem 0.9rem;border-radius:6px;font-size:0.8rem;font-weight:700;color:{BLUE};background:rgba(59,130,246,0.18);white-space:nowrap;">Partnerships</span></div>', unsafe_allow_html=True)
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 1.8rem;"></div>', unsafe_allow_html=True)
 
+# ── Bottom tab bar (mobile) ──────────────────────────────────────────────────
+with st.container(key="tabbar"):
+    _t1, _t2, _t3, _t4, _t5 = st.columns(5)
+    with _t1:
+        st.page_link("app.py", label="Home", icon="🏠")
+    with _t2:
+        st.page_link("pages/1_Meta_Ads.py", label="Meta", icon="📣")
+    with _t3:
+        st.page_link("pages/2_Shopify.py", label="Shopify", icon="🛍️")
+    with _t4:
+        st.page_link("pages/3_Google_Ads.py", label="Google", icon="🔍")
+    with _t5:
+        st.markdown('<div class="tab-current">⚙️ More</div>', unsafe_allow_html=True)
+
 # ── Page header ───────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div style="padding-bottom:1.4rem;border-bottom:1px solid {BORDER};margin-bottom:2rem;">

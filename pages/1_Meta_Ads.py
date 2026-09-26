@@ -128,6 +128,20 @@ with st.container(key="navbar"):
         st.page_link("pages/10_Partnerships.py", label="Partnerships")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 1.8rem;"></div>', unsafe_allow_html=True)
 
+# ── Bottom tab bar (mobile) ──────────────────────────────────────────────────
+with st.container(key="tabbar"):
+    _t1, _t2, _t3, _t4, _t5 = st.columns(5)
+    with _t1:
+        st.page_link("app.py", label="Home", icon="🏠")
+    with _t2:
+        st.markdown('<div class="tab-current">📣 Meta</div>', unsafe_allow_html=True)
+    with _t3:
+        st.page_link("pages/2_Shopify.py", label="Shopify", icon="🛍️")
+    with _t4:
+        st.page_link("pages/3_Google_Ads.py", label="Google", icon="🔍")
+    with _t5:
+        st.page_link("pages/11_More.py", label="More", icon="⚙️")
+
 PURCHASE_TYPES     = {"purchase", "offsite_conversion.fb_pixel_purchase", "omni_purchase"}
 PRODUCT_VIEW_TYPES = {"offsite_conversion.fb_pixel_view_content", "view_content", "omni_view_content"}
 WISHLIST_TYPES     = {"onsite_conversion.add_to_wishlist", "omni_add_to_wishlist"}

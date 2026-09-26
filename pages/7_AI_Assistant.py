@@ -116,6 +116,20 @@ with st.container(key="navbar"):
         st.page_link("pages/10_Partnerships.py", label="Partnerships")
 st.markdown(f'<div style="border-top:1px solid {BORDER};margin:0.5rem 0 1.5rem;"></div>', unsafe_allow_html=True)
 
+# ── Bottom tab bar (mobile) ──────────────────────────────────────────────────
+with st.container(key="tabbar"):
+    _t1, _t2, _t3, _t4, _t5 = st.columns(5)
+    with _t1:
+        st.page_link("app.py", label="Home", icon="🏠")
+    with _t2:
+        st.page_link("pages/1_Meta_Ads.py", label="Meta", icon="📣")
+    with _t3:
+        st.page_link("pages/2_Shopify.py", label="Shopify", icon="🛍️")
+    with _t4:
+        st.page_link("pages/3_Google_Ads.py", label="Google", icon="🔍")
+    with _t5:
+        st.markdown('<div class="tab-current">⚙️ More</div>', unsafe_allow_html=True)
+
 st.markdown(f"""
 <div style="margin-bottom:1.5rem;">
   <div style="font-size:1.4rem;font-weight:700;color:{T1};letter-spacing:-0.5px;">AI Business Assistant</div>

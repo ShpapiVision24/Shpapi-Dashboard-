@@ -6,8 +6,13 @@ def inject_mobile_css():
     rules load last and can override the page's fixed-width layout."""
     st.markdown("""
     <style>
+    /* Bottom tab bar: built for mobile, hidden on desktop by default */
+    .st-key-tabbar {
+        display: none;
+    }
+
     @media (max-width: 640px) {
-        .block-container { padding: 1rem 1rem 3rem 1rem !important; }
+        .block-container { padding: 1rem 1rem 6.5rem 1rem !important; }
 
         .kpi-grid, .insights-grid, .stat-grid {
             grid-template-columns: repeat(2, 1fr) !important;
@@ -15,24 +20,48 @@ def inject_mobile_css():
         }
         .kpi-value, .insight-value { font-size: 1.3rem !important; }
 
-        .st-key-navbar [data-testid="stHorizontalBlock"] {
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            overflow-x: auto !important;
-            -webkit-overflow-scrolling: touch !important;
-            gap: 0.15rem !important;
-        }
-        .st-key-navbar [data-testid="stHorizontalBlock"] > div {
-            flex: 0 0 auto !important;
-            width: auto !important;
-            min-width: fit-content !important;
-        }
-        a[data-testid="stPageLink-NavLink"] {
-            padding: 0.3rem 0.55rem !important;
-            font-size: 0.68rem !important;
-        }
+        /* Top nav bar is replaced by the bottom tab bar on mobile */
+        .st-key-navbar { display: none !important; }
 
         [data-testid="stDataFrame"] { font-size: 0.78rem !important; }
+
+        /* Fixed bottom tab bar, iOS style */
+        .st-key-tabbar {
+            display: block !important;
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            z-index: 9999;
+            background: rgba(10, 22, 40, 0.85);
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding: 0.4rem 0.3rem calc(0.3rem + env(safe-area-inset-bottom, 0px)) 0.3rem;
+        }
+        .st-key-tabbar [data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            gap: 0 !important;
+        }
+        .st-key-tabbar div[data-testid="stPageLink"] { padding-top: 0 !important; }
+        .st-key-tabbar a[data-testid="stPageLink-NavLink"],
+        .st-key-tabbar .tab-current {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            padding: 0.55rem 0.1rem !important;
+            font-size: 0.66rem !important;
+            font-weight: 600 !important;
+            text-align: center;
+            line-height: 1.3 !important;
+            border-radius: 12px !important;
+        }
+        .st-key-tabbar a[data-testid="stPageLink-NavLink"] p,
+        .st-key-tabbar .tab-current p { font-size: 0.66rem !important; margin: 0 !important; }
+        .st-key-tabbar a[data-testid="stPageLink-NavLink"] { color: rgba(255,255,255,0.55) !important; }
+        .st-key-tabbar .tab-current {
+            color: #3b82f6 !important;
+            background: rgba(59,130,246,0.14) !important;
+        }
     }
 
     @media (max-width: 420px) {

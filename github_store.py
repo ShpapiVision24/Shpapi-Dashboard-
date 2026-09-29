@@ -17,7 +17,7 @@ GITHUB_BRANCH = "main"
 
 
 def available():
-    return "GITHUB_TOKEN" in st.secrets
+    return bool(st.secrets.get("GITHUB_TOKEN"))
 
 
 def _headers():

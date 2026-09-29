@@ -35,6 +35,11 @@ REPLIED_STATUSES = {"Replied", "Declined", "Partnered"}
 # your Sent folder. Change this if the naming convention ever changes.
 GMAIL_SUBJECT_QUERY = '"Shpapi x"'
 
+# Test sends to yourself (same convention Grok Bot already follows: "test
+# email for all of them" doesn't count as real outreach). Add any other
+# personal/test addresses here if you use more than one.
+GMAIL_EXCLUDE_RECIPIENTS = {"andres.villarreal7211@gmail.com", "contact@shpapivision.com"}
+
 st.set_page_config(page_title="Shpapi · Partnerships", layout="wide", initial_sidebar_state="collapsed")
 
 from auth import check_password
@@ -139,7 +144,7 @@ st.markdown(f"""
 
 # ── Load data ────────────────────────────────────────────────────────────────
 COLUMNS = ["id", "business_name", "contact_name", "contact_email", "date_sent",
-           "email_style", "status", "reply_date", "notes"]
+           "email_style", "status", "reply_date", "notes", "gmail_thread_id"]
 
 def load_outreach():
     if github_store.available():
@@ -259,81 +264,110 @@ def _derive_business_name(subject, contact_email):
         return contact_email.split("@")[-1].split(".")[0].replace("-", " ").title()
     return s or contact_email or "Unknown"
 
-def scan_gmail_outreach():
-    """Every sent email matching GMAIL_SUBJECT_QUERY, one entry per thread,
-    with whether anyone other than you has replied in that thread."""
+RESOLVED_STATUSES = {"Replied", "Declined", "Partnered", "Bounced"}
+
+def _thread_has_reply(thread_id, headers, own_email):
+    thread = requests.get(
+        f"https://gmail.googleapis.com/gmail/v1/users/me/threads/{thread_id}",
+        headers=headers, params={"format": "metadata"}, timeout=15,
+    ).json()
+    for tm in thread.get("messages", []):
+        from_hdr = {h["name"]: h["value"] for h in tm.get("payload", {}).get("headers", [])}.get("From", "").lower()
+        if own_email and own_email not in from_hdr:
+            return True
+    return False
+
+def _list_outreach_threads(headers):
+    """Every (thread_id -> a representative message id) matching GMAIL_SUBJECT_QUERY
+    in Sent — paginated, capped at 500 messages. This call alone is cheap (no
+    per-message detail fetch); the expensive per-thread lookups happen only for
+    threads sync_outreach_from_gmail() decides it actually needs to check."""
+    thread_to_msg, page_token, pages = {}, None, 0
+    while pages < 5:
+        params = {"q": f"in:sent subject:{GMAIL_SUBJECT_QUERY}", "maxResults": 100}
+        if page_token:
+            params["pageToken"] = page_token
+        resp = requests.get("https://gmail.googleapis.com/gmail/v1/users/me/messages",
+                             headers=headers, params=params, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        for m in data.get("messages", []):
+            thread_to_msg.setdefault(m["threadId"], m["id"])
+        page_token = data.get("nextPageToken")
+        pages += 1
+        if not page_token:
+            break
+    return thread_to_msg
+
+def sync_outreach_from_gmail(records):
+    """Adds newly-found outreach and flips Sent -> Replied where applicable.
+    Skips full detail fetches for threads already resolved (Replied/Declined/
+    Partnered/Bounced) so steady-state syncs stay cheap even with a large
+    outreach history — only genuinely new threads or still-pending ("Sent")
+    ones cost extra API calls."""
     token = _gmail_access_token()
     headers = {"Authorization": f"Bearer {token}"}
     own_email = st.secrets.get("gmail", {}).get("address", "").lower()
 
-    resp = requests.get(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-        headers=headers,
-        params={"q": f"in:sent subject:{GMAIL_SUBJECT_QUERY}", "maxResults": 100},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    msg_ids = [m["id"] for m in resp.json().get("messages", [])]
+    by_thread = {r["gmail_thread_id"]: r for r in records if r.get("gmail_thread_id")}
+    by_email = {r.get("contact_email", "").lower(): r for r in records if r.get("contact_email")}
 
-    results, seen_threads = [], set()
-    for mid in msg_ids:
+    added = updated = 0
+    for thread_id, msg_id in _list_outreach_threads(headers).items():
+        existing = by_thread.get(thread_id)
+
+        if existing:
+            if existing.get("status") in RESOLVED_STATUSES:
+                continue  # already resolved, nothing to check
+            if _thread_has_reply(thread_id, headers, own_email):
+                existing["status"] = "Replied"
+                existing["reply_date"] = date.today().isoformat()
+                updated += 1
+            continue
+
+        # Never-seen thread — need the message headers to know who/what/when
         m = requests.get(
-            f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{mid}",
+            f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}",
             headers=headers, params={"format": "metadata"}, timeout=15,
         ).json()
-        thread_id = m.get("threadId")
-        if not thread_id or thread_id in seen_threads:
-            continue
-        seen_threads.add(thread_id)
         hmap = {h["name"]: h["value"] for h in m.get("payload", {}).get("headers", [])}
         to_addr = _parse_recipient(hmap.get("To", ""))
         subject = hmap.get("Subject", "")
+        if not to_addr or to_addr.lower() in GMAIL_EXCLUDE_RECIPIENTS:
+            continue
         try:
             date_sent = parsedate_to_datetime(hmap.get("Date", "")).date().isoformat()
         except Exception:
             date_sent = date.today().isoformat()
 
-        thread = requests.get(
-            f"https://gmail.googleapis.com/gmail/v1/users/me/threads/{thread_id}",
-            headers=headers, params={"format": "metadata"}, timeout=15,
-        ).json()
-        replied = False
-        for tm in thread.get("messages", []):
-            from_hdr = {h["name"]: h["value"] for h in tm.get("payload", {}).get("headers", [])}.get("From", "").lower()
-            if own_email and own_email not in from_hdr:
-                replied = True
-                break
+        replied = _thread_has_reply(thread_id, headers, own_email)
+        email_key = to_addr.lower()
 
-        if to_addr:
-            results.append({"contact_email": to_addr, "subject": subject,
-                             "date_sent": date_sent, "replied": replied})
-    return results
-
-def sync_outreach_from_gmail(records):
-    scanned = scan_gmail_outreach()
-    by_email = {r.get("contact_email", "").lower(): r for r in records if r.get("contact_email")}
-    added = updated = 0
-    for item in scanned:
-        email = item["contact_email"].lower()
-        if email in by_email:
-            row = by_email[email]
-            if item["replied"] and row.get("status") == "Sent":
+        if email_key in by_email:
+            # Matches a row already logged (e.g. entered manually) without a
+            # thread id yet — attach this thread to it instead of duplicating.
+            row = by_email[email_key]
+            row["gmail_thread_id"] = thread_id
+            if replied and row.get("status") == "Sent":
                 row["status"] = "Replied"
                 row["reply_date"] = date.today().isoformat()
                 updated += 1
         else:
             new_row = {
                 "id": str(uuid.uuid4()),
-                "business_name": _derive_business_name(item["subject"], item["contact_email"]),
-                "contact_name": "", "contact_email": item["contact_email"],
-                "date_sent": item["date_sent"], "email_style": "",
-                "status": "Replied" if item["replied"] else "Sent",
-                "reply_date": date.today().isoformat() if item["replied"] else None,
+                "business_name": _derive_business_name(subject, to_addr),
+                "contact_name": "", "contact_email": to_addr,
+                "date_sent": date_sent, "email_style": "",
+                "status": "Replied" if replied else "Sent",
+                "reply_date": date.today().isoformat() if replied else None,
                 "notes": "Auto-detected from Gmail",
+                "gmail_thread_id": thread_id,
             }
             records.append(new_row)
-            by_email[email] = new_row
+            by_thread[thread_id] = new_row
+            by_email[email_key] = new_row
             added += 1
+
     return records, added, updated
 
 if not st.secrets.get("gmail"):
@@ -385,6 +419,7 @@ edited_df = st.data_editor(
                   "email_style", "status", "reply_date", "notes"],
     column_config={
         "id": None,
+        "gmail_thread_id": None,
         "business_name": st.column_config.TextColumn("Business / Boutique", width="medium"),
         "contact_name": st.column_config.TextColumn("Contact Name", width="small"),
         "contact_email": st.column_config.TextColumn("Contact Email", width="medium"),

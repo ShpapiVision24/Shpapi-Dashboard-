@@ -6,6 +6,7 @@ import sys
 import uuid
 import requests
 from datetime import date, datetime
+from email.utils import parsedate_to_datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import github_store
@@ -27,6 +28,12 @@ RED     = "#ef4444"
 
 STATUS_OPTIONS  = ["Sent", "Replied", "Declined", "Partnered", "Bounced"]
 REPLIED_STATUSES = {"Replied", "Declined", "Partnered"}
+
+# Outreach emails are sent with subjects like "Shpapi x {Store}" (matches
+# how Grok Bot already names them) — this is what tells the auto-sync
+# below which sent emails are partnership outreach vs. everything else in
+# your Sent folder. Change this if the naming convention ever changes.
+GMAIL_SUBJECT_QUERY = '"Shpapi x"'
 
 st.set_page_config(page_title="Shpapi · Partnerships", layout="wide", initial_sidebar_state="collapsed")
 
@@ -223,8 +230,8 @@ if not style_df.empty:
 else:
     st.markdown(f'<div style="text-align:center;padding:2rem;color:{T3};font-size:0.85rem;">Log some outreach with an Email Style tag below to see this breakdown.</div>', unsafe_allow_html=True)
 
-# ── Gmail reply check ────────────────────────────────────────────────────────
-st.markdown('<div class="section">Check Gmail for Replies</div>', unsafe_allow_html=True)
+# ── Live Gmail sync ───────────────────────────────────────────────────────────
+st.markdown('<div class="section">Live Gmail Sync</div>', unsafe_allow_html=True)
 
 def _gmail_access_token():
     cfg = st.secrets.get("gmail")
@@ -237,48 +244,132 @@ def _gmail_access_token():
     r.raise_for_status()
     return r.json()["access_token"]
 
-def check_gmail_replies(records):
+def _parse_recipient(to_header):
+    if "<" in to_header and ">" in to_header:
+        return to_header.split("<", 1)[1].split(">", 1)[0].strip()
+    return to_header.strip()
+
+def _derive_business_name(subject, contact_email):
+    s = (subject or "").strip()
+    if s.lower().startswith("shpapi x "):
+        name = s[len("shpapi x "):].strip()
+        if name:
+            return name
+    if contact_email and "@" in contact_email:
+        return contact_email.split("@")[-1].split(".")[0].replace("-", " ").title()
+    return s or contact_email or "Unknown"
+
+def scan_gmail_outreach():
+    """Every sent email matching GMAIL_SUBJECT_QUERY, one entry per thread,
+    with whether anyone other than you has replied in that thread."""
     token = _gmail_access_token()
-    checked, found = 0, 0
-    for r in records:
-        if r.get("status") != "Sent" or not r.get("contact_email") or not r.get("date_sent"):
+    headers = {"Authorization": f"Bearer {token}"}
+    own_email = st.secrets.get("gmail", {}).get("address", "").lower()
+
+    resp = requests.get(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        headers=headers,
+        params={"q": f"in:sent subject:{GMAIL_SUBJECT_QUERY}", "maxResults": 100},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    msg_ids = [m["id"] for m in resp.json().get("messages", [])]
+
+    results, seen_threads = [], set()
+    for mid in msg_ids:
+        m = requests.get(
+            f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{mid}",
+            headers=headers, params={"format": "metadata"}, timeout=15,
+        ).json()
+        thread_id = m.get("threadId")
+        if not thread_id or thread_id in seen_threads:
             continue
-        checked += 1
-        after = str(r["date_sent"])[:10].replace("-", "/")
-        resp = requests.get(
-            "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-            headers={"Authorization": f"Bearer {token}"},
-            params={"q": f"from:{r['contact_email']} after:{after}", "maxResults": 1},
-            timeout=15,
-        )
-        resp.raise_for_status()
-        if resp.json().get("messages"):
-            r["status"] = "Replied"
-            r["reply_date"] = date.today().isoformat()
-            found += 1
-    return records, checked, found
+        seen_threads.add(thread_id)
+        hmap = {h["name"]: h["value"] for h in m.get("payload", {}).get("headers", [])}
+        to_addr = _parse_recipient(hmap.get("To", ""))
+        subject = hmap.get("Subject", "")
+        try:
+            date_sent = parsedate_to_datetime(hmap.get("Date", "")).date().isoformat()
+        except Exception:
+            date_sent = date.today().isoformat()
+
+        thread = requests.get(
+            f"https://gmail.googleapis.com/gmail/v1/users/me/threads/{thread_id}",
+            headers=headers, params={"format": "metadata"}, timeout=15,
+        ).json()
+        replied = False
+        for tm in thread.get("messages", []):
+            from_hdr = {h["name"]: h["value"] for h in tm.get("payload", {}).get("headers", [])}.get("From", "").lower()
+            if own_email and own_email not in from_hdr:
+                replied = True
+                break
+
+        if to_addr:
+            results.append({"contact_email": to_addr, "subject": subject,
+                             "date_sent": date_sent, "replied": replied})
+    return results
+
+def sync_outreach_from_gmail(records):
+    scanned = scan_gmail_outreach()
+    by_email = {r.get("contact_email", "").lower(): r for r in records if r.get("contact_email")}
+    added = updated = 0
+    for item in scanned:
+        email = item["contact_email"].lower()
+        if email in by_email:
+            row = by_email[email]
+            if item["replied"] and row.get("status") == "Sent":
+                row["status"] = "Replied"
+                row["reply_date"] = date.today().isoformat()
+                updated += 1
+        else:
+            new_row = {
+                "id": str(uuid.uuid4()),
+                "business_name": _derive_business_name(item["subject"], item["contact_email"]),
+                "contact_name": "", "contact_email": item["contact_email"],
+                "date_sent": item["date_sent"], "email_style": "",
+                "status": "Replied" if item["replied"] else "Sent",
+                "reply_date": date.today().isoformat() if item["replied"] else None,
+                "notes": "Auto-detected from Gmail",
+            }
+            records.append(new_row)
+            by_email[email] = new_row
+            added += 1
+    return records, added, updated
 
 if not st.secrets.get("gmail"):
     st.markdown(f"""
     <div style="background:{SURFACE};border:1px solid {BORDER};border-radius:12px;padding:1.25rem 1.5rem;font-size:0.82rem;color:{T2};line-height:1.6;">
-      Not connected yet — replies have to be marked manually below (set Status to "Replied" on the row) until this is set up.
+      Not connected yet — log outreach and mark replies manually below until this is set up.
       <br><br>
-      To turn this on: create (or reuse) a Google OAuth client with Gmail API access, run a token script to get a refresh token
-      for your business Gmail account (scope <code>gmail.readonly</code>), then add a <code>[gmail]</code> block to Streamlit
-      secrets with <code>client_id</code>, <code>client_secret</code>, and <code>refresh_token</code>. Once that's there, this
-      button will check every "Sent" row against your inbox automatically.
+      To turn this on: enable the Gmail API on the same Google Cloud project as the existing Google Ads OAuth client, run
+      <code>get_gmail_token.py</code> to get a refresh token for your business Gmail, then add a <code>[gmail]</code> block to
+      Streamlit secrets with <code>client_id</code>, <code>client_secret</code>, <code>refresh_token</code>, and
+      <code>address</code> (your Gmail address, e.g. contact@shpapivision.com). Once that's there, this section will scan your
+      Sent folder for outreach automatically — no manual entry needed.
     </div>
     """, unsafe_allow_html=True)
 else:
-    if st.button("Check now", key="check_gmail_replies"):
+    @st.fragment(run_every="60s")
+    def render_gmail_sync():
         try:
-            with st.spinner("Checking Gmail for replies..."):
-                updated, checked, found = check_gmail_replies(outreach)
-            save_outreach(updated)
-            st.success(f"Checked {checked} pending outreach — found {found} new repl{'y' if found == 1 else 'ies'}.")
-            st.rerun()
+            current = load_outreach()
+            merged, added, updated = sync_outreach_from_gmail(current)
+            st.session_state["_last_gmail_sync"] = datetime.now().strftime("%I:%M:%S %p")
+            if added or updated:
+                save_outreach(merged)
+                st.rerun()
         except Exception as e:
-            st.error(f"Couldn't check Gmail: {e}")
+            st.error(f"Gmail sync error: {e}")
+            return
+        last = st.session_state.get("_last_gmail_sync", "—")
+        st.markdown(
+            f'<span style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:{T2};">'
+            f'<span style="width:7px;height:7px;border-radius:50%;background:{GREEN};box-shadow:0 0 6px {GREEN};"></span>'
+            f'Live — scanning Sent mail for "{GMAIL_SUBJECT_QUERY}" every 60s &nbsp;·&nbsp; Last checked: {last}</span>',
+            unsafe_allow_html=True,
+        )
+
+    render_gmail_sync()
 
 # ── Editable outreach log ────────────────────────────────────────────────────
 st.markdown('<div class="section">Outreach Log</div>', unsafe_allow_html=True)

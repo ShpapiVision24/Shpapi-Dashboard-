@@ -1,0 +1,76 @@
+{
+  "outreach": [
+    {
+      "id": "60c81f80-a0e3-47ab-8444-305f52477814",
+      "business_name": "Outline",
+      "contact_name": "",
+      "contact_email": "hello@outlinebrooklyn.com",
+      "date_sent": "2026-09-22",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0cb12982b8b2f2"
+    },
+    {
+      "id": "5dce3758-85a0-4878-bd05-f806cf1a8cc9",
+      "business_name": "Caf\u00e9 Forgot",
+      "contact_name": "",
+      "contact_email": "info@cafeforgot.com",
+      "date_sent": "2026-09-22",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0ca721de14ab46"
+    },
+    {
+      "id": "713fb8a6-7f3f-47b1-91d6-1aaad4ad0b3b",
+      "business_name": "KabJuun",
+      "contact_name": "",
+      "contact_email": "Taniaf@kabjuun.com, Marketing@kabjuun.com",
+      "date_sent": "2026-09-21",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0c6913d435ae8e"
+    },
+    {
+      "id": "b53f11df-4722-4018-8519-8823bb5446e4",
+      "business_name": "Colbo",
+      "contact_name": "",
+      "contact_email": "hi@colbo.nyc",
+      "date_sent": "2026-09-18",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0b5c87f7a94adb"
+    },
+    {
+      "id": "d4427d7d-6d66-45bd-b5d1-d80edc6a2b73",
+      "business_name": "Pilgrimsurfsupply",
+      "contact_name": "",
+      "contact_email": "online@pilgrimsurfsupply.com",
+      "date_sent": "2026-09-18",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0b5c2cf57773cd"
+    },
+    {
+      "id": "cc9f69b7-5790-46a4-a588-1ceaf9ac0707",
+      "business_name": "Prive Padel Partnership",
+      "contact_name": "",
+      "contact_email": "info@sarahgargano.com",
+      "date_sent": "2026-06-01",
+      "email_style": "",
+      "status": "Replied",
+      "reply_date": "2026-09-29",
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "19e82dab461eba5d"
+    }
+  ]
+}

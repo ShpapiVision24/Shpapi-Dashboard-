@@ -183,7 +183,7 @@
     {
       "id": "56800d08-4d19-4034-b0f6-9ae4dc02948f",
       "business_name": "Surf Lodge",
-      "contact_name": null,
+      "contact_name": "",
       "contact_email": null,
       "date_sent": null,
       "email_style": null,

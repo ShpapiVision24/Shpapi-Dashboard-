@@ -71,6 +71,18 @@
       "reply_date": "2026-09-29",
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "19e82dab461eba5d"
+    },
+    {
+      "id": "c51794f7-4bf3-4455-9e40-36486ad81212",
+      "business_name": "Lockwood",
+      "contact_name": "",
+      "contact_email": "shop@lockwoodshop.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f3428d4b0d96e"
     }
   ]
 }

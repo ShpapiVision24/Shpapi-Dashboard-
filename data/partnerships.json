@@ -131,6 +131,42 @@
       "reply_date": null,
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f351921f65d9e"
+    },
+    {
+      "id": "e444175e-e49f-4a98-9640-f0dc92d09e04",
+      "business_name": "Cueva",
+      "contact_name": "",
+      "contact_email": "info@cuevashop.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f35371e2b2eca"
+    },
+    {
+      "id": "d3c46453-ecb4-4856-9f18-62de5a4530ff",
+      "business_name": "Nepenthes New York",
+      "contact_name": "",
+      "contact_email": "shop@nepenthesny.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f3533540a8a02"
+    },
+    {
+      "id": "7c1759a4-2ffa-42fa-930a-469472337cba",
+      "business_name": "Extra Butter",
+      "contact_name": "",
+      "contact_email": "info@extrabutterny.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f352ff6b84d2d"
     }
   ]
 }

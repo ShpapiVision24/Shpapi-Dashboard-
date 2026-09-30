@@ -83,6 +83,54 @@
       "reply_date": null,
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f3428d4b0d96e"
+    },
+    {
+      "id": "74e4c955-efc6-4840-be80-40cd1035b98a",
+      "business_name": "The Frankie Shop",
+      "contact_name": "",
+      "contact_email": "info@thefrankieshop.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f352c9c0bf78f"
+    },
+    {
+      "id": "d8cdeb7f-eb5f-4c8d-aa62-70b90ab469a4",
+      "business_name": "Tangerine",
+      "contact_name": "",
+      "contact_email": "info@tangerine-nyc.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f3529605aeeea"
+    },
+    {
+      "id": "57d285ea-2916-4b2f-92db-178c9f796ede",
+      "business_name": "VIBE TWLV",
+      "contact_name": "",
+      "contact_email": "info@vibetwelve.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f352620025287"
+    },
+    {
+      "id": "c01f3eb8-e319-4c94-aa62-04c620da501e",
+      "business_name": "Shine Optique",
+      "contact_name": "",
+      "contact_email": "shop@shineoptique.com",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f351921f65d9e"
     }
   ]
 }

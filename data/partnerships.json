@@ -167,6 +167,18 @@
       "reply_date": null,
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f352ff6b84d2d"
+    },
+    {
+      "id": "151f47ae-030e-4b89-b554-29589c4bfe7d",
+      "business_name": "Kabjuun",
+      "contact_name": "Jimena ",
+      "contact_email": "N/A ",
+      "date_sent": null,
+      "email_style": null,
+      "status": "Sent",
+      "reply_date": null,
+      "notes": null,
+      "gmail_thread_id": null
     }
   ]
 }

@@ -275,16 +275,29 @@ def _derive_business_name(subject, contact_email):
 
 RESOLVED_STATUSES = {"Replied", "Declined", "Partnered", "Bounced"}
 
-def _thread_has_reply(thread_id, headers, own_email):
+BOUNCE_SENDERS = ("mailer-daemon@", "postmaster@")
+
+def _classify_thread(thread_id, headers):
+    """Returns 'reply', 'bounce', or None (nothing back yet). Uses Gmail's
+    own SENT label to tell "ours" from "theirs" instead of matching a
+    specific address — outreach sometimes goes out through a send-as alias
+    (e.g. shpapivisions@gmail.com) that doesn't match the gmail.address
+    secret, which was getting misread as an external reply. A delivery
+    failure from mailer-daemon/postmaster is a bounce, not a reply."""
     thread = requests.get(
         f"https://gmail.googleapis.com/gmail/v1/users/me/threads/{thread_id}",
         headers=headers, params={"format": "metadata"}, timeout=15,
     ).json()
+    result = None
     for tm in thread.get("messages", []):
+        if "SENT" in tm.get("labelIds", []):
+            continue
         from_hdr = {h["name"]: h["value"] for h in tm.get("payload", {}).get("headers", [])}.get("From", "").lower()
-        if own_email and own_email not in from_hdr:
-            return True
-    return False
+        if any(s in from_hdr for s in BOUNCE_SENDERS):
+            result = result or "bounce"
+            continue
+        return "reply"
+    return result
 
 def _list_outreach_threads(headers):
     """Every (thread_id -> a representative message id) matching GMAIL_SUBJECT_QUERY
@@ -316,7 +329,6 @@ def sync_outreach_from_gmail(records):
     ones cost extra API calls."""
     token = _gmail_access_token()
     headers = {"Authorization": f"Bearer {token}"}
-    own_email = st.secrets.get("gmail", {}).get("address", "").lower()
 
     by_thread = {r["gmail_thread_id"]: r for r in records if r.get("gmail_thread_id")}
     by_email = {r.get("contact_email", "").lower(): r for r in records if r.get("contact_email")}
@@ -328,9 +340,13 @@ def sync_outreach_from_gmail(records):
         if existing:
             if existing.get("status") in RESOLVED_STATUSES:
                 continue  # already resolved, nothing to check
-            if _thread_has_reply(thread_id, headers, own_email):
+            outcome = _classify_thread(thread_id, headers)
+            if outcome == "reply":
                 existing["status"] = "Replied"
                 existing["reply_date"] = date.today().isoformat()
+                updated += 1
+            elif outcome == "bounce":
+                existing["status"] = "Bounced"
                 updated += 1
             continue
 
@@ -349,7 +365,7 @@ def sync_outreach_from_gmail(records):
         except Exception:
             date_sent = date.today().isoformat()
 
-        replied = _thread_has_reply(thread_id, headers, own_email)
+        outcome = _classify_thread(thread_id, headers)
         email_key = to_addr.lower()
 
         if email_key in by_email:
@@ -357,18 +373,22 @@ def sync_outreach_from_gmail(records):
             # thread id yet — attach this thread to it instead of duplicating.
             row = by_email[email_key]
             row["gmail_thread_id"] = thread_id
-            if replied and row.get("status") == "Sent":
-                row["status"] = "Replied"
-                row["reply_date"] = date.today().isoformat()
-                updated += 1
+            if row.get("status") == "Sent":
+                if outcome == "reply":
+                    row["status"] = "Replied"
+                    row["reply_date"] = date.today().isoformat()
+                    updated += 1
+                elif outcome == "bounce":
+                    row["status"] = "Bounced"
+                    updated += 1
         else:
             new_row = {
                 "id": str(uuid.uuid4()),
                 "business_name": _derive_business_name(subject, to_addr),
                 "contact_name": "", "contact_email": to_addr,
                 "date_sent": date_sent, "email_style": "",
-                "status": "Replied" if replied else "Sent",
-                "reply_date": date.today().isoformat() if replied else None,
+                "status": "Replied" if outcome == "reply" else ("Bounced" if outcome == "bounce" else "Sent"),
+                "reply_date": date.today().isoformat() if outcome == "reply" else None,
                 "notes": "Auto-detected from Gmail",
                 "gmail_thread_id": thread_id,
             }

@@ -732,12 +732,45 @@ def get_google_live_status():
     except Exception:
         return None
 
-with st.spinner("Loading overview..."):
-    meta      = get_meta_summary()
-    shopify   = get_shopify_summary()
-    instagram = get_instagram_summary()
-    google    = get_google_ads_summary()
-    insights  = get_business_insights()
+_LOADING_ICONS = ["📊", "🗃️", "🌐", "📋", "📈", "🧑‍💼", "🔮", "📉",
+                   "☁️", "📥", "🔍", "🎲", "📽️", "❓", "🤝", "🖥️",
+                   "🥧", "📶", "⚙️", "🔬"]
+
+_loading = st.empty()
+with _loading.container():
+    _icons_html = "".join(
+        f'<div class="shpapi-loading-icon">{i}</div>' for i in _LOADING_ICONS * 2
+    )
+    st.markdown(f"""
+    <style>
+    @keyframes shpapi-marquee {{ from {{ transform: translateX(0); }} to {{ transform: translateX(-50%); }} }}
+    .shpapi-loading-track {{
+        overflow: hidden; width: 100%;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    }}
+    .shpapi-loading-icons {{
+        display: flex; width: max-content; gap: 0.9rem;
+        animation: shpapi-marquee 1.8s linear infinite;
+    }}
+    .shpapi-loading-icon {{
+        flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+        background: {SURFACE}; border: 1px solid {BORDER};
+        display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+    }}
+    </style>
+    <div style="padding: 1.5rem 0 2rem;">
+      <div class="shpapi-loading-track"><div class="shpapi-loading-icons">{_icons_html}</div></div>
+      <div style="margin-top:1rem; font-size:0.8rem; color:{T3};">Loading overview&hellip;</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+meta      = get_meta_summary()
+shopify   = get_shopify_summary()
+instagram = get_instagram_summary()
+google    = get_google_ads_summary()
+insights  = get_business_insights()
+_loading.empty()
 
 def _ctr_str(summary):
     if not summary or not summary.get("impressions"):

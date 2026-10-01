@@ -67,7 +67,7 @@
       "contact_email": "info@sarahgargano.com",
       "date_sent": "2026-06-01",
       "email_style": "",
-      "status": "Replied",
+      "status": "Sent",
       "reply_date": null,
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "19e82dab461eba5d"
@@ -187,7 +187,7 @@
       "contact_email": "hello@7spring.nyc",
       "date_sent": "2026-09-30",
       "email_style": "",
-      "status": "Replied",
+      "status": "Bounced",
       "reply_date": null,
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f4553335dd29d"

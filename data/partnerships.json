@@ -179,6 +179,18 @@
       "reply_date": null,
       "notes": null,
       "gmail_thread_id": null
+    },
+    {
+      "id": "5ec92f4a-037d-489d-9e57-543590844a98",
+      "business_name": "7 Spring, Collection IV launch",
+      "contact_name": "",
+      "contact_email": "hello@7spring.nyc",
+      "date_sent": "2026-09-30",
+      "email_style": "",
+      "status": "Replied",
+      "reply_date": "2026-10-01",
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0f4553335dd29d"
     }
   ]
 }

@@ -187,9 +187,9 @@
       "contact_email": "hello@7spring.nyc",
       "date_sent": "2026-09-30",
       "email_style": "",
-      "status": "Bounced",
-      "reply_date": null,
-      "notes": "Auto-detected from Gmail",
+      "status": "Replied",
+      "reply_date": "2026-10-01",
+      "notes": "Auto-detected from Gmail; Replied (original email bounced \u2014 came back via another channel)",
       "gmail_thread_id": "1a0f4553335dd29d"
     },
     {

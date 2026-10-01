@@ -146,15 +146,23 @@ st.markdown(f"""
 COLUMNS = ["id", "business_name", "contact_name", "contact_email", "date_sent",
            "email_style", "status", "reply_date", "notes", "gmail_thread_id"]
 
-def load_outreach():
+def load_outreach(fresh=False):
+    """Cached in session state so a cell edit doesn't force a fresh GitHub
+    GET on every rerun — only the first load this session (or an explicit
+    fresh=True, used by the Gmail sync fragment) hits the network."""
+    if not fresh and "_outreach_records" in st.session_state:
+        return st.session_state["_outreach_records"]
     if github_store.available():
         data, sha = github_store.load_json(GITHUB_PATH, {"outreach": []})
         st.session_state["_partnerships_sha"] = sha
-        return data.get("outreach", [])
-    if not os.path.exists(DATA_FILE):
-        return []
-    with open(DATA_FILE) as f:
-        return json.load(f).get("outreach", [])
+        records = data.get("outreach", [])
+    elif os.path.exists(DATA_FILE):
+        with open(DATA_FILE) as f:
+            records = json.load(f).get("outreach", [])
+    else:
+        records = []
+    st.session_state["_outreach_records"] = records
+    return records
 
 def save_outreach(records):
     if github_store.available():
@@ -164,10 +172,11 @@ def save_outreach(records):
             "Update partnerships outreach log",
         )
         st.session_state["_partnerships_sha"] = new_sha
-        return
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-    with open(DATA_FILE, "w") as f:
-        json.dump({"outreach": records}, f, indent=2, default=str)
+    else:
+        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+        with open(DATA_FILE, "w") as f:
+            json.dump({"outreach": records}, f, indent=2, default=str)
+    st.session_state["_outreach_records"] = records
 
 if github_store.available():
     st.caption("Synced to GitHub — changes are saved permanently.")
@@ -386,7 +395,7 @@ else:
     @st.fragment(run_every="60s")
     def render_gmail_sync():
         try:
-            current = load_outreach()
+            current = load_outreach(fresh=True)
             merged, added, updated = sync_outreach_from_gmail(current)
             st.session_state["_last_gmail_sync"] = datetime.now().strftime("%I:%M:%S %p")
             if added or updated:
@@ -409,12 +418,14 @@ else:
 st.markdown('<div class="section">Outreach Log</div>', unsafe_allow_html=True)
 st.markdown(f'<div style="font-size:0.78rem;color:{T3};margin:-0.6rem 0 1rem;">Add a row every time you send a partnership pitch. Edit any cell directly — changes save automatically. Use the trash icon on a row to remove an entry.</div>', unsafe_allow_html=True)
 
+_editor_key = f"partnerships_editor_{st.session_state.get('_partnerships_sha', 'nosha')}"
+
 edited_df = st.data_editor(
     df,
     num_rows="dynamic",
     use_container_width=True,
     hide_index=True,
-    key="partnerships_editor",
+    key=_editor_key,
     column_order=["business_name", "contact_name", "contact_email", "date_sent",
                   "email_style", "status", "reply_date", "notes"],
     column_config={
@@ -452,7 +463,6 @@ for r in records:
 if records != outreach:
     try:
         save_outreach(records)
-        st.rerun()
     except Exception as e:
         st.error(f"Couldn't save changes to GitHub: {e}")
 

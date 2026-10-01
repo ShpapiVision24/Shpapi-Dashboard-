@@ -191,6 +191,18 @@
       "reply_date": "2026-10-01",
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f4553335dd29d"
+    },
+    {
+      "id": "647b8f32-2967-4cc2-b485-e1a282fa823a",
+      "business_name": "Surf Lodge",
+      "contact_name": "",
+      "contact_email": "",
+      "date_sent": "2026-10-01",
+      "email_style": "",
+      "status": "Replied",
+      "reply_date": "2026-10-01",
+      "notes": "Had a call with them",
+      "gmail_thread_id": null
     }
   ]
 }

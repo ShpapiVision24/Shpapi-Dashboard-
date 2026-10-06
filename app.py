@@ -863,6 +863,7 @@ if insights:
         ("Orders", f"{insights['total_orders']:,}", f"{insights['orders_mtd']:,} MTD"),
         ("Units Sold", f"{insights['units_sold']:,}", "All time"),
         ("Avg. Order Value", f"${insights['aov']:,.2f}", "Revenue ÷ orders"),
+        ("Social Media Ad Spend", f"${meta['spend']:,.2f}" if meta else "—", "Meta/Instagram, all accounts, all time"),
         ("ROAS", f"{roas:.2f}x" if roas is not None else "—", "Revenue ÷ ad spend"),
         ("Est. CAC", f"${cac:,.2f}" if cac is not None else "—", "Ad spend ÷ customers"),
         ("Repeat Purchase Rate", f"{insights['repeat_rate']*100:.1f}%", "Customers who bought again"),

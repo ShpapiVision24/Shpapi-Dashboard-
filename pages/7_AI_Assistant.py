@@ -137,30 +137,26 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+from meta_accounts import get_meta_account_ids, fetch_insights_multi
+
 # ── Secrets ───────────────────────────────────────────────────────────────────
-ACCESS_TOKEN  = st.secrets.get("META_ACCESS_TOKEN", "")
-AD_ACCOUNT_ID = st.secrets.get("AD_ACCOUNT_ID", "")
-SHOPIFY_TOKEN = st.secrets.get("SHOPIFY_TOKEN", "")
-SHOP_URL      = st.secrets.get("SHOP_URL", "")
-SH_HEADERS    = {"X-Shopify-Access-Token": SHOPIFY_TOKEN, "Content-Type": "application/json"}
+ACCESS_TOKEN     = st.secrets.get("META_ACCESS_TOKEN", "")
+META_ACCOUNT_IDS = get_meta_account_ids()  # every Meta ad account combined
+SHOPIFY_TOKEN    = st.secrets.get("SHOPIFY_TOKEN", "")
+SHOP_URL         = st.secrets.get("SHOP_URL", "")
+SH_HEADERS       = {"X-Shopify-Access-Token": SHOPIFY_TOKEN, "Content-Type": "application/json"}
 
 # ── Data fetchers ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def load_meta():
-    if not ACCESS_TOKEN or not AD_ACCOUNT_ID:
+    if not ACCESS_TOKEN:
         return None, "No token"
     try:
         def _fetch(params):
-            rows, url = [], f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/insights"
-            p = {"fields": "campaign_name,spend,reach,impressions,clicks,actions,action_values",
-                 "level": "campaign", "limit": 100, "access_token": ACCESS_TOKEN, **params}
-            while url:
-                r = requests.get(url, params=p, timeout=15).json()
-                if "error" in r:
-                    return None, r["error"].get("message", "error")
-                rows.extend(r.get("data", []))
-                url = r.get("paging", {}).get("next"); p = {}
-            return rows, None
+            return fetch_insights_multi(
+                ACCESS_TOKEN, "campaign_name,spend,reach,impressions,clicks,actions,action_values",
+                level="campaign", account_ids=META_ACCOUNT_IDS, extra_params=params,
+            ), None
 
         rows_30, _ = _fetch({"date_preset": "last_30d"})
         rows_all, err = _fetch({"date_preset": "maximum"})

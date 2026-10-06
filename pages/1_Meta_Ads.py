@@ -8,8 +8,10 @@ import numpy as np
 import os
 from datetime import datetime, timezone
 
-ACCESS_TOKEN  = st.secrets["META_ACCESS_TOKEN"]
-AD_ACCOUNT_ID = st.secrets["AD_ACCOUNT_ID"]
+from meta_accounts import get_meta_account_ids, fetch_insights_multi, fetch_campaigns_multi
+
+ACCESS_TOKEN     = st.secrets["META_ACCESS_TOKEN"]
+META_ACCOUNT_IDS = get_meta_account_ids()  # every Meta ad account combined
 ASSETS        = os.path.join(os.path.dirname(__file__), "..", "assets")
 LOGO_SRC      = os.path.join(ASSETS, "logo.png")
 LOGO_CROP     = os.path.join(ASSETS, "logo_cropped.png")
@@ -150,29 +152,21 @@ WISHLIST_TYPES     = {"onsite_conversion.add_to_wishlist", "omni_add_to_wishlist
 def get_ad_data():
     import datetime
     today = datetime.date.today().isoformat()
-    camp_r = requests.get(
-        f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/campaigns",
-        params={"fields": "id,start_time,stop_time", "limit": 500, "access_token": ACCESS_TOKEN},
-    )
+    camps = fetch_campaigns_multi(ACCESS_TOKEN, "id,start_time,stop_time", account_ids=META_ACCOUNT_IDS)
     camp_dates = {}
-    for c in camp_r.json().get("data", []):
+    for c in camps:
         start = c["start_time"][:10] if c.get("start_time") else ""
         stop  = c["stop_time"][:10]  if c.get("stop_time")  else today
         camp_dates[c["id"]] = (start, stop)
-    url = f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/insights"
-    params = {
-        "fields": "campaign_id,campaign_name,spend,impressions,clicks,actions,action_values,date_start,date_stop",
-        "date_preset": "maximum", "level": "campaign", "access_token": ACCESS_TOKEN,
-    }
-    r    = requests.get(url, params=params)
-    data = r.json()
-    if "error" in data:
-        st.error(f"API Error: {data['error']['message']}")
-        return pd.DataFrame()
-    if "data" not in data or not data["data"]:
+    data = fetch_insights_multi(
+        ACCESS_TOKEN,
+        "campaign_id,campaign_name,spend,impressions,clicks,actions,action_values,date_start,date_stop",
+        level="campaign", date_preset="maximum", account_ids=META_ACCOUNT_IDS,
+    )
+    if not data:
         return pd.DataFrame()
     rows = []
-    for item in data["data"]:
+    for item in data:
         purchases, revenue = 0, 0.0
         link_clicks, lpv, product_views, wishlist, video_views = 0, 0, 0, 0, 0
         for a in item.get("actions", []):
@@ -201,24 +195,19 @@ from meta_status import parse_dt, campaign_status
 
 @st.cache_data(ttl=300)
 def get_active_campaign_ids(spend_by_campaign):
-    r = requests.get(
-        f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/campaigns",
-        params={"fields": "id,effective_status,end_time,stop_time,lifetime_budget",
-                "limit": 500, "access_token": ACCESS_TOKEN},
+    camps = fetch_campaigns_multi(
+        ACCESS_TOKEN, "id,effective_status,end_time,stop_time,lifetime_budget",
+        account_ids=META_ACCOUNT_IDS,
     )
-    camps = r.json().get("data", [])
     return [c["id"] for c in camps
             if campaign_status(c, spend_by_campaign.get(c["id"], 0.0)) == "Active"]
 
 @st.cache_data(ttl=300)
 def get_today_insights():
-    url = f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/insights"
-    params = {
-        "fields": "campaign_id,spend,actions,action_values",
-        "date_preset": "today", "level": "campaign", "access_token": ACCESS_TOKEN,
-    }
-    r = requests.get(url, params=params)
-    data = r.json().get("data", [])
+    data = fetch_insights_multi(
+        ACCESS_TOKEN, "campaign_id,spend,actions,action_values",
+        level="campaign", date_preset="today", account_ids=META_ACCOUNT_IDS,
+    )
     out = {}
     for item in data:
         purchases, revenue = 0, 0.0

@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from meta_status import campaign_status
+from meta_accounts import get_meta_account_ids, fetch_insights_multi, fetch_campaigns_multi
 
 try:
     from fpdf import FPDF
@@ -48,8 +49,8 @@ T3      = "rgba(255,255,255,0.38)"
 BLUE    = "#3b82f6"
 
 ACCESS_TOKEN      = st.secrets["META_ACCESS_TOKEN"]
-AD_ACCOUNT_ID     = st.secrets["AD_ACCOUNT_ID"]
 IG_AD_ACCOUNT_ID  = "act_8429913163714900"
+META_ACCOUNT_IDS  = get_meta_account_ids()  # every Meta ad account combined for "all Meta" totals
 SHOPIFY_TOKEN     = st.secrets["SHOPIFY_TOKEN"]
 SHOP_URL          = st.secrets["SHOP_URL"]
 SHOPIFY_HEADERS   = {"X-Shopify-Access-Token": SHOPIFY_TOKEN}
@@ -302,15 +303,14 @@ PURCHASE_ACTION_TYPES = {"purchase", "offsite_conversion.fb_pixel_purchase", "om
 
 @st.cache_data(ttl=3600)
 def get_meta_summary():
+    """Combined across every Meta ad account (META_ACCOUNT_IDS) — Shpapi
+    runs ads from more than one, and a single-account total was quietly
+    missing whatever spend landed in the others."""
     try:
-        r = requests.get(
-            f"https://graph.facebook.com/v19.0/{AD_ACCOUNT_ID}/insights",
-            params={"fields": "spend,impressions,actions,action_values",
-                    "date_preset": "maximum", "level": "campaign",
-                    "access_token": ACCESS_TOKEN},
-            timeout=15,
+        rows = fetch_insights_multi(
+            ACCESS_TOKEN, "spend,impressions,actions,action_values",
+            level="campaign", date_preset="maximum", account_ids=META_ACCOUNT_IDS,
         )
-        rows = r.json().get("data", [])
         total_spend   = sum(float(d.get("spend", 0)) for d in rows)
         total_impr    = sum(int(d.get("impressions", 0)) for d in rows)
         total_lclicks = 0
@@ -462,29 +462,28 @@ def get_shopify_growth_monthly():
 
 @st.cache_data(ttl=3600)
 def get_ad_growth_monthly(account_id, token):
-    """All-time monthly spend/impressions/reach/clicks for a Meta ad account (Ads or Instagram)."""
+    """All-time monthly spend/impressions/reach/clicks for one or more Meta
+    ad accounts (pass a single id or a list — results are summed by month)."""
     try:
-        r = requests.get(
-            f"https://graph.facebook.com/v19.0/{account_id}/insights",
-            params={"fields": "spend,impressions,reach,actions",
-                    "date_preset": "maximum", "level": "account",
-                    "time_increment": "monthly", "access_token": token},
-            timeout=20,
+        account_ids = [account_id] if isinstance(account_id, str) else account_id
+        rows = fetch_insights_multi(
+            token, "spend,impressions,reach,actions", level="account",
+            date_preset="maximum", extra_params={"time_increment": "monthly"},
+            account_ids=account_ids,
         )
-        rows = r.json().get("data", [])
-        out = []
+        by_month = {}
         for d in rows:
             clicks = 0
             for a in d.get("actions", []):
                 if a.get("action_type") == "link_click":
                     clicks += int(float(a["value"]))
-            out.append({
-                "month_str": d["date_start"][:7],
-                "spend": float(d.get("spend", 0)),
-                "impressions": int(d.get("impressions", 0)),
-                "reach": int(d.get("reach", 0)),
-                "clicks": clicks,
-            })
+            m = d["date_start"][:7]
+            bucket = by_month.setdefault(m, {"month_str": m, "spend": 0.0, "impressions": 0, "reach": 0, "clicks": 0})
+            bucket["spend"]       += float(d.get("spend", 0))
+            bucket["impressions"] += int(d.get("impressions", 0))
+            bucket["reach"]       += int(d.get("reach", 0))
+            bucket["clicks"]      += clicks
+        out = sorted(by_month.values(), key=lambda b: b["month_str"])
         return pd.DataFrame(out) if out else None
     except Exception:
         return None
@@ -595,8 +594,9 @@ def get_instagram_summary():
     except:
         return None
 
-def _last_active_campaign(account_id):
-    """Most recent date+campaign this ad account actually delivered impressions on.
+def _last_active_campaign(account_ids):
+    """Most recent date+campaign across these ad account(s) that actually
+    delivered impressions.
 
     Meta's campaign-level effective_status is not a reliable "is this really
     running" signal for this account — campaigns tend to stay ACTIVE even after
@@ -604,15 +604,11 @@ def _last_active_campaign(account_id):
     signal, so we look at the most recent day with impressions instead.
     """
     try:
-        rows, url = [], f"https://graph.facebook.com/v19.0/{account_id}/insights"
-        params = {"fields": "campaign_name,impressions", "level": "campaign", "date_preset": "maximum",
-                   "time_increment": 1, "access_token": ACCESS_TOKEN, "limit": 500}
-        while url:
-            r = requests.get(url, params=params, timeout=15)
-            data = r.json()
-            rows.extend(data.get("data", []))
-            url    = data.get("paging", {}).get("next")
-            params = {}
+        rows = fetch_insights_multi(
+            ACCESS_TOKEN, "campaign_name,impressions", level="campaign",
+            date_preset="maximum", extra_params={"time_increment": 1},
+            account_ids=account_ids,
+        )
         active_rows = [d for d in rows if int(d.get("impressions", 0)) > 0]
         if not active_rows:
             return None, None
@@ -626,18 +622,14 @@ def _days_since(date_str):
         return None
     return (date.today() - datetime.strptime(date_str, "%Y-%m-%d").date()).days
 
-def _campaign_spend_map(account_id):
-    """All-time spend per campaign — needed to check lifetime-budget exhaustion."""
+def _campaign_spend_map(account_ids):
+    """All-time spend per campaign across these account(s) — needed to check
+    lifetime-budget exhaustion."""
     try:
-        rows, url = [], f"https://graph.facebook.com/v19.0/{account_id}/insights"
-        params = {"fields": "campaign_id,spend", "level": "campaign", "date_preset": "maximum",
-                   "access_token": ACCESS_TOKEN, "limit": 200}
-        while url:
-            r = requests.get(url, params=params, timeout=15)
-            data = r.json()
-            rows.extend(data.get("data", []))
-            url    = data.get("paging", {}).get("next")
-            params = {}
+        rows = fetch_insights_multi(
+            ACCESS_TOKEN, "campaign_id,spend", level="campaign",
+            date_preset="maximum", account_ids=account_ids,
+        )
         spend_map = {}
         for d in rows:
             cid = d.get("campaign_id")
@@ -647,8 +639,9 @@ def _campaign_spend_map(account_id):
     except Exception:
         return {}
 
-def _platform_live_status(account_id):
-    """Whether this Meta ad account has a genuinely still-running campaign.
+def _platform_live_status(account_ids):
+    """Whether any of these Meta ad account(s) has a genuinely still-running
+    campaign. Accepts either a single account id or a list.
 
     Checking effective_status == 'ACTIVE' alone isn't enough — Meta doesn't
     flip it just because a campaign passed its own scheduled end date or ran
@@ -657,29 +650,28 @@ def _platform_live_status(account_id):
     (effective_status + end date + budget) as the Meta Ads and Instagram
     detail pages, so this can't disagree with what those pages show.
     """
+    if isinstance(account_ids, str):
+        account_ids = [account_ids]
     try:
-        r = requests.get(
-            f"https://graph.facebook.com/v19.0/{account_id}/campaigns",
-            params={"fields": "id,name,effective_status,end_time,stop_time,lifetime_budget,updated_time",
-                    "limit": 500, "access_token": ACCESS_TOKEN},
-            timeout=15,
+        camps = fetch_campaigns_multi(
+            ACCESS_TOKEN, "id,name,effective_status,end_time,stop_time,lifetime_budget,updated_time",
+            account_ids=account_ids,
         )
-        camps = r.json().get("data", [])
         if not camps:
             return None
-        spend_map    = _campaign_spend_map(account_id)
+        spend_map    = _campaign_spend_map(account_ids)
         truly_active = [c for c in camps if campaign_status(c, spend_map.get(c["id"], 0.0)) == "Active"]
         if truly_active:
             current = max(truly_active, key=lambda c: c.get("updated_time", ""))
             return {"status": "live", "campaign_name": current.get("name"), "days_since": 0}
-        last_date, campaign_name = _last_active_campaign(account_id)
+        last_date, campaign_name = _last_active_campaign(account_ids)
         return {"status": "paused", "campaign_name": campaign_name, "days_since": _days_since(last_date)}
     except Exception:
         return None
 
 @st.cache_data(ttl=300)
 def get_meta_live_status():
-    return _platform_live_status(AD_ACCOUNT_ID)
+    return _platform_live_status(META_ACCOUNT_IDS)
 
 @st.cache_data(ttl=300)
 def get_instagram_live_status():
@@ -849,7 +841,7 @@ render_live_campaigns()
 
 with st.spinner("Loading growth history..."):
     growth_shopify     = get_shopify_growth_monthly()
-    growth_meta        = get_ad_growth_monthly(AD_ACCOUNT_ID, ACCESS_TOKEN)
+    growth_meta        = get_ad_growth_monthly(META_ACCOUNT_IDS, ACCESS_TOKEN)
     growth_instagram   = get_ad_growth_monthly(IG_AD_ACCOUNT_ID, ACCESS_TOKEN)
     growth_google      = get_google_growth_monthly()
 
@@ -857,7 +849,11 @@ with st.spinner("Loading growth history..."):
 st.markdown('<div class="section">Business Insights</div>', unsafe_allow_html=True)
 
 if insights:
-    total_spend = sum(x["spend"] for x in (meta, google, instagram) if x)
+    # meta already includes the Instagram ad account (META_ACCOUNT_IDS covers
+    # all Meta accounts combined) — instagram here is a drill-down into just
+    # that one account, not a separate platform, so it's excluded here to
+    # avoid double-counting its spend into the cross-platform total.
+    total_spend = sum(x["spend"] for x in (meta, google) if x)
     roas = (insights["total_revenue"] / total_spend) if total_spend else None
     cac  = (total_spend / insights["unique_customers"]) if total_spend and insights["unique_customers"] else None
 
@@ -1100,7 +1096,7 @@ with col1:
     meta_impr   = f"{meta['impressions']:,}" if meta else "—"
     st.markdown(f"""
     <div class="platform-card" style="border-top:3px solid #3b82f6;">
-      <div class="platform-title">Meta Ads</div>
+      <div class="platform-title">Meta Ads <span style="font-size:0.65rem;font-weight:500;color:{T3};">(all accounts combined)</span></div>
       <div class="platform-metric-label">Total Spend (All Time)</div>
       <div class="platform-metric-value">{meta_spend}</div>
       <div class="platform-metric-label">Link Clicks</div>
@@ -1252,7 +1248,9 @@ if not FPDF_OK:
     st.info("PDF export will be available after the next deploy (fpdf2 is installing).")
 else:
     def _build_dashboard_pdf():
-        total_spend = sum(x["spend"] for x in (meta, google, instagram) if x)
+        # meta already covers all Meta accounts combined, including the
+        # Instagram one — see the Business Insights total_spend comment above.
+        total_spend = sum(x["spend"] for x in (meta, google) if x)
         roas = (insights["total_revenue"] / total_spend) if insights and total_spend else None
         cac  = (total_spend / insights["unique_customers"]) if insights and total_spend and insights["unique_customers"] else None
 

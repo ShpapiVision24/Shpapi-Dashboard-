@@ -115,8 +115,8 @@
       "contact_email": "info@vibetwelve.com",
       "date_sent": "2026-09-30",
       "email_style": "",
-      "status": "Sent",
-      "reply_date": null,
+      "status": "Replied",
+      "reply_date": "2026-10-06",
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f352620025287"
     },
@@ -211,8 +211,8 @@
       "contact_email": "events@7spring.nyc",
       "date_sent": "2026-10-01",
       "email_style": "",
-      "status": "Sent",
-      "reply_date": null,
+      "status": "Replied",
+      "reply_date": "2026-10-06",
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f97a37d686f58"
     }

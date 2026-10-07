@@ -129,25 +129,73 @@ else:
     start_date = today - timedelta(days=30)
 end_date = today - timedelta(days=1)
 
+_CH = {
+    "SEARCH": "Search", "DISPLAY": "Display", "SHOPPING": "Shopping",
+    "VIDEO": "Video", "PERFORMANCE_MAX": "Perf. Max",
+    "MULTI_CHANNEL": "Perf. Max", "SMART": "Smart",
+    "DEMAND_GEN": "Demand Gen", "DISCOVERY": "Discovery",
+}
+_BID = {
+    "MAXIMIZE_CONVERSION_VALUE": "Max Conv. Value",
+    "MAXIMIZE_CONVERSIONS": "Max Conversions",
+    "TARGET_CPA": "Target CPA",
+    "TARGET_ROAS": "Target ROAS",
+    "TARGET_IMPRESSION_SHARE": "Target Impr. Share",
+    "MANUAL_CPC": "Manual CPC",
+    "MANUAL_CPM": "Manual CPM",
+    "TARGET_CPM": "Target CPM",
+}
+
+def _google_ads_client():
+    from google.ads.googleads.client import GoogleAdsClient
+    cfg = st.secrets["google_ads"]
+    config = {
+        "developer_token": cfg["developer_token"],
+        "client_id": cfg["client_id"],
+        "client_secret": cfg["client_secret"],
+        "refresh_token": cfg["refresh_token"],
+        "login_customer_id": cfg["client_customer_id"].replace("-", ""),
+        "use_proto_plus": True,
+    }
+    client = GoogleAdsClient.load_from_dict(config)
+    return client.get_service("GoogleAdsService"), cfg["client_customer_id"].replace("-", "")
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_google_campaigns_meta():
+    """Every non-removed campaign with its creation date — independent of
+    any metrics date-range filter, so a campaign that's paused or had no
+    activity in the selected window still shows up with its Date Added
+    instead of the whole Campaign Breakdown table going blank."""
+    try:
+        ga_service, customer_id = _google_ads_client()
+        query = """
+            SELECT campaign.name, campaign.status, campaign.advertising_channel_type,
+                   campaign.bidding_strategy_type, campaign.start_date_time
+            FROM campaign
+            WHERE campaign.status != 'REMOVED'
+        """
+        response = ga_service.search(customer_id=customer_id, query=query)
+        rows = []
+        for row in response:
+            ch_raw  = row.campaign.advertising_channel_type.name
+            bid_raw = row.campaign.bidding_strategy_type.name
+            rows.append({
+                "Campaign":     row.campaign.name,
+                "Type":         _CH.get(ch_raw, ch_raw.replace("_", " ").title()),
+                "Bid Strategy": _BID.get(bid_raw, bid_raw.replace("_", " ").title()),
+                "Status":       row.campaign.status.name,
+                "Date Added":   row.campaign.start_date_time[:10],
+            })
+        return pd.DataFrame(rows), None
+    except Exception as e:
+        return None, str(e)
+
 # ── Google Ads data fetch ─────────────────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_google_ads_data(start_str, end_str):
     try:
-        from google.ads.googleads.client import GoogleAdsClient
         from google.ads.googleads.errors import GoogleAdsException
-
-        cfg = st.secrets["google_ads"]
-        config = {
-            "developer_token": cfg["developer_token"],
-            "client_id": cfg["client_id"],
-            "client_secret": cfg["client_secret"],
-            "refresh_token": cfg["refresh_token"],
-            "login_customer_id": cfg["client_customer_id"].replace("-", ""),
-            "use_proto_plus": True,
-        }
-        client = GoogleAdsClient.load_from_dict(config)
-        ga_service = client.get_service("GoogleAdsService")
-        customer_id = cfg["client_customer_id"].replace("-", "")
+        ga_service, customer_id = _google_ads_client()
 
         query = f"""
             SELECT
@@ -171,23 +219,6 @@ def fetch_google_ads_data(start_str, end_str):
               AND campaign.status != 'REMOVED'
             ORDER BY metrics.cost_micros DESC
         """
-
-        _CH = {
-            "SEARCH": "Search", "DISPLAY": "Display", "SHOPPING": "Shopping",
-            "VIDEO": "Video", "PERFORMANCE_MAX": "Perf. Max",
-            "MULTI_CHANNEL": "Perf. Max", "SMART": "Smart",
-            "DEMAND_GEN": "Demand Gen", "DISCOVERY": "Discovery",
-        }
-        _BID = {
-            "MAXIMIZE_CONVERSION_VALUE": "Max Conv. Value",
-            "MAXIMIZE_CONVERSIONS": "Max Conversions",
-            "TARGET_CPA": "Target CPA",
-            "TARGET_ROAS": "Target ROAS",
-            "TARGET_IMPRESSION_SHARE": "Target Impr. Share",
-            "MANUAL_CPC": "Manual CPC",
-            "MANUAL_CPM": "Manual CPM",
-            "TARGET_CPM": "Target CPM",
-        }
 
         response = ga_service.search(customer_id=customer_id, query=query)
         rows = []
@@ -223,6 +254,7 @@ def fetch_google_ads_data(start_str, end_str):
 
 with st.spinner("Loading Google Ads data…"):
     df, error = fetch_google_ads_data(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+    camps_meta, meta_error = fetch_google_campaigns_meta()
 
 if error:
     needs_2fa = "two_step_verification_not_enrolled" in error.lower() or "2-step verification" in error.lower()
@@ -260,9 +292,19 @@ if error:
         st.error(f"Google Ads API error: {error}")
     st.stop()
 
-if df is None or df.empty:
+no_metrics = df is None or df.empty
+if no_metrics and (camps_meta is None or camps_meta.empty):
     st.markdown(f'<div style="text-align:center;padding:4rem;color:{T3};font-size:0.9rem;">No campaign data found for the selected period.</div>', unsafe_allow_html=True)
     st.stop()
+
+if no_metrics:
+    # No activity in the selected date range, but campaigns still exist —
+    # keep going with zeroed KPIs/chart instead of hiding the whole page,
+    # so the Campaign Breakdown below can still show every campaign's
+    # Date Added even when none of them spent anything recently.
+    df = pd.DataFrame(columns=["Campaign", "Type", "Bid Strategy", "Status", "Date", "Date Added",
+                                "Impressions", "Clicks", "Cost", "Conversions", "Conv. Value",
+                                "CTR", "Avg CPC", "Conv. Rate", "Cost / Conv.", "ROAS"])
 
 # ── Aggregate KPIs ────────────────────────────────────────────────────────────
 total_spend       = df["Cost"].sum()
@@ -341,16 +383,38 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ── Campaign breakdown ────────────────────────────────────────────────────────
 st.markdown('<div class="section">Campaign Breakdown</div>', unsafe_allow_html=True)
-camp = (df.groupby(["Campaign", "Type", "Bid Strategy", "Status", "Date Added"])
-          .agg(
-              Impressions  = ("Impressions",  "sum"),
-              Clicks       = ("Clicks",       "sum"),
-              Cost         = ("Cost",         "sum"),
-              Conversions  = ("Conversions",  "sum"),
-              Conv_Value   = ("Conv. Value",  "sum"),
-          )
-          .reset_index()
-          .sort_values("Date Added", ascending=False))
+
+metrics_by_campaign = (
+    df.groupby("Campaign")
+      .agg(Impressions=("Impressions", "sum"), Clicks=("Clicks", "sum"),
+           Cost=("Cost", "sum"), Conversions=("Conversions", "sum"),
+           Conv_Value=("Conv. Value", "sum"))
+      .reset_index()
+    if not df.empty else
+    pd.DataFrame({"Campaign": pd.Series(dtype="object"),
+                  "Impressions": pd.Series(dtype="float64"), "Clicks": pd.Series(dtype="float64"),
+                  "Cost": pd.Series(dtype="float64"), "Conversions": pd.Series(dtype="float64"),
+                  "Conv_Value": pd.Series(dtype="float64")})
+)
+
+if camps_meta is not None and not camps_meta.empty:
+    # Every known campaign, regardless of whether it had activity in the
+    # selected date range — so Date Added always shows, even for paused
+    # campaigns with nothing to report this period.
+    camp = camps_meta.merge(metrics_by_campaign, on="Campaign", how="left")
+    for col in ["Impressions", "Clicks", "Cost", "Conversions", "Conv_Value"]:
+        camp[col] = camp[col].fillna(0)
+else:
+    camp = (df.groupby(["Campaign", "Type", "Bid Strategy", "Status", "Date Added"])
+              .agg(
+                  Impressions  = ("Impressions",  "sum"),
+                  Clicks       = ("Clicks",       "sum"),
+                  Cost         = ("Cost",         "sum"),
+                  Conversions  = ("Conversions",  "sum"),
+                  Conv_Value   = ("Conv. Value",  "sum"),
+              )
+              .reset_index())
+camp = camp.sort_values("Date Added", ascending=False)
 
 camp["CTR"]         = (camp["Clicks"] / camp["Impressions"] * 100).fillna(0)
 camp["Avg CPC"]     = (camp["Cost"] / camp["Clicks"]).fillna(0)

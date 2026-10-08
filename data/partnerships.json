@@ -215,6 +215,66 @@
       "reply_date": "2026-10-06",
       "notes": "Auto-detected from Gmail",
       "gmail_thread_id": "1a0f97a37d686f58"
+    },
+    {
+      "id": "c5660dc1-5b84-46f1-b88b-998c3f0ec1ff",
+      "business_name": "Million Goods",
+      "contact_name": "",
+      "contact_email": "hello@million-goods.com",
+      "date_sent": "2026-10-06",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0fcae92db207ec"
+    },
+    {
+      "id": "972472d4-593c-4eeb-8f1c-247fa30cab43",
+      "business_name": "Assembly",
+      "contact_name": "",
+      "contact_email": "buying@assemblynewyork.com",
+      "date_sent": "2026-10-06",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0fcb133892bcd9"
+    },
+    {
+      "id": "e6ad4ef0-7c05-4a88-946f-1d31a74e1e1d",
+      "business_name": "Front General Store",
+      "contact_name": "",
+      "contact_email": "info@frontgeneralstore.com",
+      "date_sent": "2026-10-06",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0fcb1a881e2818"
+    },
+    {
+      "id": "160af2a5-fb43-4f98-9e5f-29ec6f0862af",
+      "business_name": "Love Adorned",
+      "contact_name": "",
+      "contact_email": "submissions@loveadorned.com",
+      "date_sent": "2026-10-06",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0fcb2027022721"
+    },
+    {
+      "id": "d429c4ef-28d4-4644-8fc9-e38829990d09",
+      "business_name": "C'H'C'M'",
+      "contact_name": "",
+      "contact_email": "info@chcmshop.com",
+      "date_sent": "2026-10-06",
+      "email_style": "",
+      "status": "Sent",
+      "reply_date": null,
+      "notes": "Auto-detected from Gmail",
+      "gmail_thread_id": "1a0fcb248c3ff921"
     }
   ]
 }
